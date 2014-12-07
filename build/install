@@ -1,0 +1,166 @@
+#! /bin/bash
+set -e
+set -o pipefail
+
+
+# AUTHOR-CONFIGURABLE OPTIONS
+# Author of the package should set these to appropriate values.
+# End-user should not touch, unless you really know what you're doing.
+
+PERL_VERSION=5.14.4
+INSTALL_METHOD=git-clone
+INSTALL_URL=https://github.com/barefootcoder/leadpipe.git
+#INSTALL_METHOD=download-url
+#INSTALL_URL=
+INSTALL_BRANCH=
+
+# Author should set a default value here:
+: ${INSTALL_PACKAGE_TO:=/opt/test}
+
+# End user can override like so:
+# curl -kL http://myserver.com/path/to/install | INSTALL_PACKAGE_TO=~/opt/foo bash
+
+
+#############
+# FUNCTIONS #
+#############
+
+function die
+{
+	echo "$@"
+	exit 1
+}
+
+function verify_program
+{
+	program=$1
+	if which $program 2>/dev/null
+	then
+		return 0
+	elif type $program 2>/dev/null
+	then
+		return 0
+	else
+		die "cannot locate program $program (or else can't figure how to locate things)"
+	fi
+}
+
+
+#####################
+# VERIFY/CREATE DIR #
+#####################
+
+if [[ $INSTALL_PACKAGE_TO ]]
+then
+	install_dir=$INSTALL_PACKAGE_TO
+else
+	install_dir=$(dirname $0)/..
+	if [[ ! -d $install_dir/perl5 ]]
+	then
+		die 'you must set $INSTALL_PACKAGE_TO before calling this script'
+	fi
+fi
+
+if [[ -e $install_dir ]]
+then
+	if [[ ! -d $install_dir ]]
+	then
+		die "requested directory $install_dir is not a directory"
+	fi
+
+	if [[ ! -w $install_dir ]]
+	then
+		die "requested directory $install_dir is not writeable (re-run with sudo?)"
+	fi
+else
+	parent_dir=$(dirname $install_dir)
+	if [[ ! -e $parent_dir ]]
+	then
+		die "can't make $install_dir because $parent_dir doesn't exist"
+	fi
+
+	if [[ ! -d $parent_dir ]]
+	then
+		die "can't make $install_dir because $parent_dir isn't a directory"
+	fi
+
+	if [[ ! -w $parent_dir ]]
+	then
+		die "can't make $install_dir because $parent_dir is not writeable (re-run with sudo?)"
+	fi
+
+	mkdir $install_dir || die "can't make install dir (maybe disk error?)"
+	if [[ ! -w $install_dir ]]
+	then
+		die "made directory $install_dir but now can't write to it (hunh?)"
+	fi
+fi
+
+# need an absolute path
+install_dir=$(perl -MCwd=realpath -e 'print realpath(shift)' $install_dir)
+
+
+##############################
+# INSTALL FILES IF NECESSARY #
+##############################
+
+if ! perl -e 'exit not glob(shift . "/*")' $install_dir
+then
+	# install directory appears to be empty
+	# let's fill it up
+	case $INSTALL_METHOD in
+		git-clone)		verify_program git
+						git ${INSTALL_BRANCH:+ --branch $INSTALL_BRANCH} clone $INSTALL_URL $install_dir
+						;;
+		download-tar)	verify_program curl
+						verify_program tar
+						chdir $install_dir
+						curl -kL $INSTALL_URL | tar xpzf -
+						;;
+		*)				die "unknown install method: $INSTALL_METHOD"
+	esac
+fi
+
+exit
+
+
+#############################
+# INSTALL PERL IF NECESSARY #
+#############################
+
+perlbrew_dir=$install_dir/perl5
+unset PERL_CPANM_OPT
+unset PERL_LOCAL_LIB_ROOT
+unset PERL_MB_OPT
+unset PERL_MM_OPT
+unset PERL5LIB
+export PERLBREW_ROOT=$perlbrew_dir
+export PERLBREW_HOME=$PERLBREW_ROOT
+unset PERLBREW_PERL
+unset PERLBREW_VERSION
+unset PERLBREW_CSHRC_VERSION
+unset PERLBREW_PATH
+unset PERLBREW_MANPATH
+
+perlbrew=$perlbrew_dir/bin/perlbrew
+if [[ ! -x $perlbrew ]]
+then
+	curl -kL http://install.perlbrew.pl | bash
+fi
+source $perlbrew_dir/etc/bashrc
+
+# let's just always do this
+# that way, we're sure to have the latest version of cpanm
+$perlbrew install-cpanm --force
+
+if [[ ! -x $perlbrew_dir/perls/perl-$PERL_VERSION/bin/perl ]]
+then
+	perlbrew install -n $PERL_VERSION
+fi
+
+
+###########################
+# INSTALL/UPGRADE MODULES #
+###########################
+
+$perlbrew_dir/bin/cpanm -n --cpanfile $install_dir/build/cpanfile --installdeps $install_dir/build/
