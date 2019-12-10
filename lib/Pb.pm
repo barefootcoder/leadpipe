@@ -6,11 +6,12 @@ use autodie ':all';
 
 # VERSION
 
-use Exporter 'import';
+use Exporter;
 our @EXPORT =
 (
 	qw< command flow >,								# structure of the command itself
 	qw< SH >,										# keywords inside a flow
+	qw< %FLOW >,									# variable containers that flows need access to
 );
 
 use Moo;
@@ -18,6 +19,18 @@ use CLI::Osprey;
 
 use Safe::Isa;
 use PerlX::bash;
+use Import::Into;
+
+
+sub import
+{
+	my $caller = caller;
+	strict->import::into($caller);
+	warnings->import::into($caller);
+	feature->import::into($caller, ':5.14');
+	autodie->import::into({level=>1}, ':all');		# `autodie` requires a bit of magic ...
+	goto \&Exporter::import;
+}
 
 
 # This is a global, sort of ... it has a global lifetime, certainly, but not global visibility.
