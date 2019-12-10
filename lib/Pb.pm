@@ -6,10 +6,18 @@ use autodie ':all';
 
 # VERSION
 
+use Exporter 'import';
+our @EXPORT =
+(
+	qw< command flow >,								# structure of the command itself
+	qw< SH >,										# keywords inside a flow
+);
+
 use Moo;
 use CLI::Osprey;
 
 use Safe::Isa;
+use PerlX::bash;
 
 
 # This is a global, sort of ... it has a global lifetime, certainly, but not global visibility.
@@ -33,9 +41,61 @@ our %FLOW =
 );
 
 
+#####################
+# COMMAND STRUCTURE #
+#####################
+
+=head1 COMMAND DEFINITION SYNTAX
+
+=head2 command
+
+Declare a Pb command.
+
+=cut
+
+sub command
+{
+	my ($name, $flow) = @_;
+	subcommand $name => $flow;
+}
+
+
+=head2 flow
+
+Specify the code for the actual command.
+
+=cut
+
+sub flow (&) { shift }
+
+
+##############
+# DIRECTIVES #
+##############
+
+
+
+=head2 SH
+
+Run a command in C<bash>.  If the command does not exit with 0, the entire command will exit.
+
+=cut
+
+sub SH (@)
+{
+	bash @_;
+}
+
+
 ####################
 # SUPPORT ROUTINES #
 ####################
+
+=head2 fatal
+
+Print a fatal error and exit.
+
+=cut
 
 sub fatal
 {
@@ -71,6 +131,21 @@ subcommand info => sub
 ##############
 # GO GO GO!! #
 ##############
+
+=begin Pod::Coverage
+
+	run
+	go
+
+=end Pod::Coverage
+
+=cut
+
+# This is only used when there's a base command (but Osprey needs it regardless).
+sub run
+{
+	$BASE_CMD->(@_) if $BASE_CMD;
+}
 
 # Osprey needs this internally, even though we're not using it for anything (yet).
 sub run {}

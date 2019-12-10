@@ -97,7 +97,14 @@ sub check_error
 		local $Test::Builder::Level = $Test::Builder::Level + 5;		# `5` determined by good ol' trial and error ...
 		$trap->die_like(qr/unexpectedly returned exit value $exit\b/, "error exit")
 				or _diag_trap($trap, $testname);
-		$trap->stderr_is( join('', map { "$_\n" } @lines), "good error" );
+		if (@lines == 1 and ref $lines[0] eq 'Regexp')
+		{
+			$trap->stderr_like( $lines[0], "good error pattern" );
+		}
+		else
+		{
+			$trap->stderr_is( join('', map { "$_\n" } @lines), "good error" );
+		}
 	};
 }
 
