@@ -108,7 +108,11 @@ Run a command in C<bash>.  If the command does not exit with 0, the entire comma
 
 sub SH (@)
 {
-	bash @_;
+	my $exitval = bash @_;
+	unless ($exitval == 0)
+	{
+		fatal("command [@_] exited non-zero [$exitval]");
+	}
 }
 
 
