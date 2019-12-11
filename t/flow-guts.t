@@ -15,6 +15,7 @@ my $test_cmd = <<'END';
 
 	command show_debug => flow
 	{
+		verify { not $FLOW{DEBUG} } 'debug starting from fresh "off" state';
 		say "debug state is ", $FLOW{DEBUG};
 	};
 
@@ -52,6 +53,17 @@ pb_basecmd(test_autodie => <<'END');
 	exit 2;
 END
 check_error pb_run('help'), 2, qr/No such file or directory/, "autodie is turned on";
+
+# `verify` demands its second argument (otherwise the error message wouldn't be very useful)
+pb_basecmd(test_verify_syntax => <<'END');
+	use Pb;
+	command bad => flow
+	{
+		verify { 1 };
+	};
+	Pb->go;
+END
+check_error pb_run('bad'), 255, qr/not enough arguments for .*verify/i, "verify syntax demands both args";
 
 
 done_testing;

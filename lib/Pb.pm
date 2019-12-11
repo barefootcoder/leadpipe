@@ -10,7 +10,7 @@ use Exporter;
 our @EXPORT =
 (
 	qw< command flow >,								# structure of the command itself
-	qw< SH >,										# keywords inside a flow
+	qw< verify SH >,								# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
 
@@ -86,6 +86,18 @@ sub flow (&) { shift }
 # DIRECTIVES #
 ##############
 
+=head2 verify
+
+Make an assertion (using a code block) which must return a true value before the command will
+execute.  Also specify the error message if the assertion fails.
+
+=cut
+
+sub verify (&$)
+{
+	my ($check, $fail_msg) = @_;
+	fatal("pre-flow check failed [$fail_msg]") unless $check->();
+}
 
 
 =head2 SH
