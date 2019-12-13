@@ -46,15 +46,27 @@ my $CMD;
 sub _pb_args { $_[0]->$_can('_osprey_config') ? @_ : ($CMD, @_) }
 
 
-##################
-# CONTEXT OBJECT #
-##################
+###################
+# CONTEXT OBJECTS #
+###################
 
 # This will be appended to with command-specific values when the flow executes.
 our %FLOW =
 (
 	DEBUG			=>	0,
 	# can't fill in ME here, because we don't know it yet
+);
+
+our %OPT;											# key == option name, value == option value
+
+
+##################
+# GLOBAL OPTIONS #
+##################
+
+option pretend =>
+(
+	is => 'ro', doc => "don't run commands; just print them",
 );
 
 
@@ -70,6 +82,12 @@ Declare a Pb command.
 
 =cut
 
+sub _extrapolate_run_mode
+{
+	return 'NOACTION' if $OPT{pretend};
+	return 'ACTION';
+}
+
 sub command
 {
 	state $CONTEXT_VAR_XLATE = { LOGFILE => 'log_to', };
@@ -83,6 +101,9 @@ sub command
 	}
 	my $subcmd = sub
 	{
+		my ($osprey) = @_;
+		my %opts = $osprey->_osprey_options;
+		%OPT = map { $_ => $osprey->$_ } keys %opts;
 
 		# I would `local`ize this, but it doesn't seem to work; not sure if that's because of the
 		# closure or because of the export (or some combination thereof).  But it shouldn't matter
@@ -90,8 +111,11 @@ sub command
 		# the program exits.  So (at least currently) it doesn't matter that we're essentially
 		# overwriting the default context container.
 		%FLOW = (%FLOW, %$context);
+		# clients may use these
 		$FLOW{TIME} = localtime($^T)->strftime("%Y%m%d%H%M%S");
 		$FLOW{DATE} = localtime($^T)->strftime("%Y%m%d");
+		# these are for internal use
+		$FLOW{':RUNMODE'} = _extrapolate_run_mode();
 
 		if ( exists $FLOW{LOGFILE} )
 		{
@@ -150,6 +174,13 @@ Run a command in C<bash>.  If the command does not exit with 0, the entire comma
 sub SH (@)
 {
 	my @cmd = @_;
+
+	if ( $FLOW{':RUNMODE'} eq 'NOACTION' )
+	{
+		say "would run: @cmd";
+		return;
+	}
+
 	push @cmd, ">>$FLOW{LOGFILE}" if exists $FLOW{LOGFILE};
 
 	my $exitval = bash @cmd;

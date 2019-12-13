@@ -22,7 +22,7 @@ my $BASE;
 
 # poor man's slurp, compressed, mostly courtesy of:
 # https://www.perl.com/article/21/2013/4/21/Read-an-entire-file-into-a-string/
-sub _slurp { local @ARGV=shift; local $/ unless wantarray; <> }
+sub _slurp { return undef unless -r "$_[0]"; local @ARGV=shift; local $/ unless wantarray; <> }
 
 
 # testing stuff
