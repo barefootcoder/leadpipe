@@ -20,6 +20,7 @@ use CLI::Osprey;
 use Safe::Isa;
 use File::Path			qw< make_path >;
 use PerlX::bash;
+use Time::Piece;
 use Import::Into;
 use File::Basename;
 
@@ -82,10 +83,6 @@ sub command
 	}
 	my $subcmd = sub
 	{
-		if ( exists $args{log_to} )
-		{
-			make_path(dirname($args{log_to}));
-		}
 
 		# I would `local`ize this, but it doesn't seem to work; not sure if that's because of the
 		# closure or because of the export (or some combination thereof).  But it shouldn't matter
@@ -93,6 +90,15 @@ sub command
 		# the program exits.  So (at least currently) it doesn't matter that we're essentially
 		# overwriting the default context container.
 		%FLOW = (%FLOW, %$context);
+		$FLOW{TIME} = localtime($^T)->strftime("%Y%m%d%H%M%S");
+		$FLOW{DATE} = localtime($^T)->strftime("%Y%m%d");
+
+		if ( exists $FLOW{LOGFILE} )
+		{
+			$FLOW{LOGFILE} =~ s/%(\w+)/$FLOW{$1}/g;
+			make_path(dirname($FLOW{LOGFILE}));
+		}
+
 		$args{flow}->();
 	};
 	subcommand $name => $subcmd;
