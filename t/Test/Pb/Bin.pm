@@ -4,7 +4,7 @@ use 5.14.0;
 use autodie ':all';
 
 use Exporter 'import';
-our @EXPORT = qw< pb_basecmd pb_run check_output check_error >;
+our @EXPORT = qw< pb_basecmd pb_run check_output check_error _slurp >;
 
 
 use Test::Most;

@@ -9,7 +9,7 @@ use autodie ':all';
 use Exporter;
 our @EXPORT =
 (
-	qw< command flow >,								# structure of the command itself
+	qw< command log_to flow >,						# structure of the command itself
 	qw< verify SH >,								# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
@@ -18,8 +18,10 @@ use Moo;
 use CLI::Osprey;
 
 use Safe::Isa;
+use File::Path			qw< make_path >;
 use PerlX::bash;
 use Import::Into;
+use File::Basename;
 
 
 sub import
@@ -47,6 +49,7 @@ sub _pb_args { $_[0]->$_can('_osprey_config') ? @_ : ($CMD, @_) }
 # CONTEXT OBJECT #
 ##################
 
+# This will be appended to with command-specific values when the flow executes.
 our %FLOW =
 (
 	DEBUG			=>	0,
@@ -68,9 +71,41 @@ Declare a Pb command.
 
 sub command
 {
-	my ($name, $flow) = @_;
-	subcommand $name => $flow;
+	state $CONTEXT_VAR_XLATE = { LOGFILE => 'log_to', };
+	my ($name, %args) = @_;
+
+	my $context = {};								# need a `my` var for the closure
+	foreach ( keys %$CONTEXT_VAR_XLATE )
+	{
+		my $arg = $CONTEXT_VAR_XLATE->{$_};
+		$context->{$_} = $args{$arg} if exists $args{$arg};
+	}
+	my $subcmd = sub
+	{
+		if ( exists $args{log_to} )
+		{
+			make_path(dirname($args{log_to}));
+		}
+
+		# I would `local`ize this, but it doesn't seem to work; not sure if that's because of the
+		# closure or because of the export (or some combination thereof).  But it shouldn't matter
+		# anyway because, on any given run of the program, exactly one flow gets executed and then
+		# the program exits.  So (at least currently) it doesn't matter that we're essentially
+		# overwriting the default context container.
+		%FLOW = (%FLOW, %$context);
+		$args{flow}->();
+	};
+	subcommand $name => $subcmd;
 }
+
+
+=head2 log_to
+
+Specify a logfile for the output of a command.
+
+=cut
+
+sub log_to ($) { log_to => shift }
 
 
 =head2 flow
@@ -79,7 +114,7 @@ Specify the code for the actual command.
 
 =cut
 
-sub flow (&) { shift }
+sub flow (&) { flow => shift }
 
 
 ##############
@@ -108,7 +143,10 @@ Run a command in C<bash>.  If the command does not exit with 0, the entire comma
 
 sub SH (@)
 {
-	my $exitval = bash @_;
+	my @cmd = @_;
+	push @cmd, ">>$FLOW{LOGFILE}" if exists $FLOW{LOGFILE};
+
+	my $exitval = bash @cmd;
 	unless ($exitval == 0)
 	{
 		fatal("command [@_] exited non-zero [$exitval]");

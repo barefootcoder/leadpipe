@@ -19,6 +19,18 @@ my $test_cmd = <<'END';
 		say "debug state is ", $FLOW{DEBUG};
 	};
 
+	# these are just to verify that commands have a flexible syntax
+	command flow_on_top => flow
+	{
+	},
+	log_to '/nowhere';
+
+	command flow_on_bottom =>
+		log_to '/nowhere',
+	flow
+	{
+	};
+
 	Pb->go;
 END
 my @commands = sort (qw< commands help info >, $test_cmd =~ /\bcommand\s+(\w+)\b/g);
