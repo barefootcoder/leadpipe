@@ -90,8 +90,25 @@ sub _extrapolate_run_mode
 
 sub command
 {
+	state $PASSTHRU_ARGS = { map { $_ => 1 } qw< log_to flow > };
 	state $CONTEXT_VAR_XLATE = { LOGFILE => 'log_to', };
-	my ($name, %args) = @_;
+	my $name = shift;
+
+	# these are all used in the closure below
+	my %args;										# arguments to this command definition
+	# process args: most are simple, some are trickier
+	while (@_)
+	{
+		if ($PASSTHRU_ARGS->{$_[0]})
+		{
+			my $arg = shift;
+			$args{$arg} = shift;
+		}
+		else
+		{
+			fatal("unknown command attribute [$_[0]]");
+		}
+	}
 
 	my $context = {};								# need a `my` var for the closure
 	foreach ( keys %$CONTEXT_VAR_XLATE )
@@ -204,7 +221,8 @@ Print a fatal error and exit.
 sub fatal
 {
 	my ($self, $msg) = &_pb_args;
-	say STDERR "$FLOW{ME}: $msg";
+	my $me = $FLOW{ME} // basename($0);
+	say STDERR "$me: $msg";
 	exit 1;
 }
 

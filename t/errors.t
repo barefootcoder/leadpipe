@@ -5,6 +5,23 @@ use lib dirname($0);
 use Test::Pb::Bin;
 
 
+# SYNTACTICAL FAILURES
+
+# `command` declaration syntax with random garbage
+pb_basecmd(bad_command => <<'END');
+	use Pb;
+	command explode =>
+		random => 'crap',
+	flow
+	{
+		say "should have died already";
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "bad_command: unknown command attribute [random]",
+		"`command` syntax rejects unknown elements";
+
+
 # OPERATIONAL FAILURES
 
 # `verify` failure
