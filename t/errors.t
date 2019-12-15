@@ -21,8 +21,75 @@ END
 check_error pb_run('explode'), 1, "bad_command: unknown command attribute [random]",
 		"`command` syntax rejects unknown elements";
 
+# unknown `arg` type
+pb_basecmd(bad_type => <<'END');
+	use Pb;
+	command explode =>
+		arg foo => must_be 'bogus-type',
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "bad_type: not a valid type [bogus-type]", "detects illegal type";
 
-# OPERATIONAL FAILURES
+# no real proper constraint
+pb_basecmd(bad_type => <<'END');
+	use Pb;
+	command explode =>
+		arg foo => 'bogus-type',
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "bad_type: not a constraint [bogus-type]", "detects lack of constraint keyword";
+
+
+# OPERATIONAL FAILURES (arguments)
+
+# `arg` failure to validate type
+pb_basecmd(argfail => <<'END');
+	use Pb;
+	use Types::Standard -types;
+	command explode =>
+		arg foo => must_be Int,
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', "x"), 1, "argfail: arg foo fails validation [x is not a Int]",
+		"can validate arg type";
+
+# `arg` failure to validate type as string
+pb_basecmd(argfail => <<'END');
+	use Pb;
+	command explode =>
+		arg foo => must_be 'Int',
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', "x"), 1, "argfail: arg foo fails validation [x is not a Int]",
+		"can validate arg typestring";
+
+# `arg` failure to validate one of a given list
+pb_basecmd(argfail => <<'END');
+	use Pb;
+	command explode =>
+		arg foo => one_of [qw< a b c >],
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', "x"), 1, "argfail: arg foo fails validation [x must be one of: a, b, c]",
+		"can validate arg list";
+
+
+# OPERATIONAL FAILURES (other)
 
 # `verify` failure
 pb_basecmd(verify => <<'END');

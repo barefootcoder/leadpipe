@@ -7,6 +7,7 @@ use Test::Pb::Bin;
 
 my $test_cmd = <<'END';
 	use Pb;
+	use Types::Standard -types;
 
 	command dumb => flow
 	{
@@ -26,6 +27,8 @@ my $test_cmd = <<'END';
 	log_to '/nowhere';
 
 	command flow_on_bottom =>
+		arg foo => must_be Str,
+		arg bar => must_be Int,
 		log_to '/nowhere',
 	flow
 	{

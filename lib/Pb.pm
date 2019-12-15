@@ -9,7 +9,7 @@ use autodie ':all';
 use Exporter;
 our @EXPORT =
 (
-	qw< command log_to flow >,						# structure of the command itself
+	qw< command arg must_be one_of log_to flow >,	# structure of the command itself
 	qw< verify SH >,								# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
@@ -19,6 +19,7 @@ use CLI::Osprey;
 
 use Safe::Isa;
 use File::Path			qw< make_path >;
+use Type::Tiny;
 use PerlX::bash;
 use Time::Piece;
 use Import::Into;
@@ -96,6 +97,7 @@ sub command
 
 	# these are all used in the closure below
 	my %args;										# arguments to this command definition
+	my $argdefs = [];								# definition of args to the command invocation
 	# process args: most are simple, some are trickier
 	while (@_)
 	{
@@ -103,6 +105,16 @@ sub command
 		{
 			my $arg = shift;
 			$args{$arg} = shift;
+		}
+		elsif ($_[0] eq 'arg')
+		{
+			shift;									# just the 'arg' marker
+			my $arg = {};
+			$arg->{name} = shift;
+			$arg->{type} = shift;
+			fatal("not a constraint [" . (ref $arg->{type} || $arg->{type}) . "]")
+					unless $arg->{type}->$_isa('Type::Tiny');
+			push @$argdefs, $arg;
 		}
 		else
 		{
@@ -134,6 +146,17 @@ sub command
 		# these are for internal use
 		$FLOW{':RUNMODE'} = _extrapolate_run_mode();
 
+		# process args (note that switches would have already been processed by Osprey)
+		foreach (@$argdefs)
+		{
+			my $arg = shift @ARGV;
+			unless ($_->{type}->check($arg))
+			{
+				fatal("arg $_->{name} fails validation [" . $_->{type}->validate($arg) . "]");
+			}
+			$FLOW{$_->{name}} = $arg;
+		}
+
 		if ( exists $FLOW{LOGFILE} )
 		{
 			$FLOW{LOGFILE} =~ s/%(\w+)/$FLOW{$1}/g;
@@ -143,6 +166,41 @@ sub command
 		$args{flow}->();
 	};
 	subcommand $name => $subcmd;
+}
+
+
+=head2 arg
+
+Declare an argument to a command.
+
+=head2 must_be
+
+Specify the type (of either an argument or option).
+
+=head2 one_of
+
+Specify the valid values for an enum type (for either an argument or option).  Use I<instead of>
+C<must_be>, not in addition to.
+
+=cut
+
+sub arg ($) { arg => shift }
+
+sub must_be ($)
+{
+	my $type = shift;
+	# slightly cheating, but this private method handles the widest range of things that might be a
+	# type (including if it's already a Type::Tiny to start with)
+	my ($t) = eval { Type::Tiny::_loose_to_TypeTiny($type) };
+	fatal("not a valid type [$type]") unless defined $t;
+	$t->create_child_type(message => sub { ($_ // '<<undef>>') . " is not a " . $t->name });
+}
+
+sub one_of ($)
+{
+	require Type::Tiny::Enum;
+	my $v = shift;
+	Type::Tiny::Enum->new( values => $v, message => sub { ($_ // '<<undef>>') . " must be one of: " . join(', ', @$v) });
 }
 
 
