@@ -9,7 +9,8 @@ use autodie ':all';
 use Exporter;
 our @EXPORT =
 (
-	qw< command arg must_be one_of log_to flow >,	# structure of the command itself
+	qw< command log_to control_via flow >,			# structure of the command itself
+	qw< arg must_be one_of >,						# for declaring command arguments
 	qw< verify SH >,								# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
@@ -17,6 +18,7 @@ our @EXPORT =
 use Moo;
 use CLI::Osprey;
 
+use Fcntl				qw< :flock >;
 use Safe::Isa;
 use File::Path			qw< make_path >;
 use Type::Tiny;
@@ -29,6 +31,7 @@ use File::Basename;
 sub import
 {
 	my $caller = caller;
+	_setup_signal_handlers();
 	strict->import::into($caller);
 	warnings->import::into($caller);
 	feature->import::into($caller, ':5.14');
@@ -59,6 +62,9 @@ our %FLOW =
 );
 
 our %OPT;											# key == option name, value == option value
+our %CONTROL;										# key == command name, value == control structure
+my  $DEFAULT_EXIT_STATUS = 'exited cleanly';		# default; update this when you hit an error
+our $EXIT_STATUS = $DEFAULT_EXIT_STATUS;
 
 
 ##################
@@ -71,9 +77,22 @@ option pretend =>
 );
 
 
-#####################
-# COMMAND STRUCTURE #
-#####################
+###############
+# SCAFFOLDING #
+###############
+
+sub _expand_vars
+{
+	shift =~ s/%(\w+)/$FLOW{$1}/gr;
+}
+
+sub _prep_filename
+{
+	my ($file) = @_;
+	$file = _expand_vars($file);
+	make_path(dirname($file));
+	return $file;
+}
 
 =head1 COMMAND DEFINITION SYNTAX
 
@@ -88,6 +107,149 @@ sub _extrapolate_run_mode
 	return 'NOACTION' if $OPT{pretend};
 	return 'ACTION';
 }
+
+sub _safe_file_rw
+{
+	my ($file, $line) = @_;
+	my ($open_mode, $lock_mode) = defined $line ? ('>', LOCK_EX) : ('<', LOCK_SH);
+
+	# This is essentially the same amount of paranoia that Proc::Pidfile undergoes.  I just don't
+	# have to catch all the errors because I have `autodie` turned on.
+	eval
+	{
+		local *FILE;
+		open FILE, $open_mode, $file;
+		flock FILE, $lock_mode;
+		if ($open_mode eq '<')
+		{
+			$line = <FILE>;
+			chomp $line;
+		}
+		else
+		{
+			say FILE $line;
+		}
+		flock FILE, LOCK_UN;
+		close(FILE);
+	};
+	if ($@)
+	{
+		fatal("file read/write failure [" . $@ =~ s/ at .*? line \d+.*\n//sr . "]")
+				unless $@ =~ /^Can't open '$file' for reading:/;
+	}
+	return $line;
+}
+
+
+# This deals with all the stuff you can put in the "control structure (i.e. the hashref that follows
+# the `control_via` keyword).
+sub _process_control_structure
+{
+	my ($cmd) = @_;
+
+	if (my $control = $CONTROL{$cmd})
+	{
+		foreach (grep { exists $control->{$_} } qw< pidfile statusfile unless_clean_exit >)
+		{
+			my $value = delete $control->{$_};
+			if ($_ eq 'pidfile')
+			{
+				require Proc::Pidfile;
+				my $pidfile = eval { Proc::Pidfile->new( pidfile => _prep_filename($value) ) };
+				if ($pidfile)
+				{
+					$FLOW{':PIDFILE'} = $pidfile;
+				}
+				else
+				{
+					if ( $@ =~ /already running: (\d+)/ )
+					{
+						$EXIT_STATUS = 'NOSAVE';
+						fatal("previous instance already running [$1]");
+					}
+					else
+					{
+						die;						# rethrow
+					}
+				}
+			}
+			elsif ($_ eq 'statusfile')
+			{
+				$FLOW{':STATFILE'} = _prep_filename($value);
+				my $statfile = sub
+				{
+					unless ($EXIT_STATUS eq 'NOSAVE')
+					{
+						_safe_file_rw($FLOW{':STATFILE'}, "last run: $EXIT_STATUS at " . scalar localtime);
+					}
+				};
+				# have to use string `eval` here, otherwise the `END` will always fire
+				eval 'END { $statfile->() }';
+			}
+			elsif ($_ eq 'unless_clean_exit')
+			{
+				fatal("cannot specify `unless_clean_exit' without `statusfile'") unless defined $FLOW{':STATFILE'};
+				my $lastrun = _safe_file_rw($FLOW{':STATFILE'});
+				if ($lastrun)											# probably means this is the first run
+				{
+					my ($last_exit) = $lastrun =~ /: (.*?) at /;
+					unless ($last_exit eq $DEFAULT_EXIT_STATUS)
+					{
+						$EXIT_STATUS = 'NOSAVE';
+						$FLOW{ERR} = $last_exit;
+						my $msg = _expand_vars($value);
+						fatal($msg);
+					}
+				}
+			}
+		}
+		fatal("unknown parameter(s) in control structure [" . join(',', sort keys %$control) . "]") if %$control;
+	}
+}
+
+
+# This guarantees that `END` blocks are not only called when your program `exit`s or `die`s, but
+# also when it's terminated due to a signal (where possible to catch).  This is super-important for
+# things like making sure pidfiles get cleaned up.  I'm pretty sure that the only times your `END`
+# blocks won't get called if your program exits after this runs is for uncatchable signals (i.e.
+# `KILL`) and if you call `exec`.  I'd worry more about that latter one, but it seems pretty
+# unlikely in a Leadpipe context.
+sub _setup_signal_handlers
+{
+	# This list compiled via the following methodology:
+	#	*	Examine the signal(7) man page on a current (at the time) Linux version (this one just
+	#		so happened to be Linux Mint 18.2, kernel 4.10.0-38-generic).
+	#	*	Find all signals which are labeled either "Term" or "Core" (i.e. all signals which will
+	#		actually cause your process to exit).
+	#	*	Eliminate everything already in sigtrap.pm's "normal-signals" list.
+	#	*	Eliminate everything already in sigtrap.pm's "error-signals" list.
+	#	*	Eliminate "KILL," because you can't catch it anyway.
+	#	*	Eliminate "USR1" and "USR2" on the grounds that we shouldn't assume anything about
+	#		"user-defined signals."
+	#	*	Whatever was leftover is the list below.
+	my @EXTRA_SIGNALS = qw< ALRM POLL PROF VTALRM XCPU XFSZ IOT STKFLT IO PWR LOST UNUSED >;
+	require sigtrap;
+	# Because of the `untrapped`, this won't bork any signals you've previously set yourself.
+	# Signals you _subsequently_ set yourself will of course override these.
+	sigtrap->import( handler => sub
+		{
+			my $signal = shift;
+			# Weirdly (or maybe not so much; I dunno), while `END` blocks don't get called if a
+			# `'DEFAULT'` signal handler leads to an exit, they _do_ for custom handlers.  So this
+			# `sub` literally doesn't need to do _anything_.  But, hey: while we're here, may as
+			# well alert the user as to what's going down.
+			$EXIT_STATUS = "terminated due to signal $signal";
+			say STDERR "received signal: $signal";
+		},
+		untrapped => 'normal-signals', 'error-signals',
+		grep { exists $SIG{$_} } @EXTRA_SIGNALS
+	);
+}
+
+
+#####################
+# COMMAND STRUCTURE #
+#####################
 
 sub command
 {
@@ -115,6 +277,13 @@ sub command
 			fatal("not a constraint [" . (ref $arg->{type} || $arg->{type}) . "]")
 					unless $arg->{type}->$_isa('Type::Tiny');
 			push @$argdefs, $arg;
+		}
+		elsif ($_[0] eq 'control')
+		{
+			shift;									# just the 'control' marker
+			my $control = shift;
+			fatal("`control_via' requires hashref") unless ref $control eq 'HASH';
+			$CONTROL{$name} = $control;
 		}
 		else
 		{
@@ -144,7 +313,7 @@ sub command
 		$FLOW{TIME} = localtime($^T)->strftime("%Y%m%d%H%M%S");
 		$FLOW{DATE} = localtime($^T)->strftime("%Y%m%d");
 		# these are for internal use
-		$FLOW{':RUNMODE'} = _extrapolate_run_mode();
+		$FLOW{':RUNMODE'} = _extrapolate_run_mode();					# more like this set by `_process_control_structure`
 
 		# process args (note that switches would have already been processed by Osprey)
 		foreach (@$argdefs)
@@ -157,11 +326,8 @@ sub command
 			$FLOW{$_->{name}} = $arg;
 		}
 
-		if ( exists $FLOW{LOGFILE} )
-		{
-			$FLOW{LOGFILE} =~ s/%(\w+)/$FLOW{$1}/g;
-			make_path(dirname($FLOW{LOGFILE}));
-		}
+		_process_control_structure($name);
+		$FLOW{LOGFILE} = _prep_filename($FLOW{LOGFILE}) if exists $FLOW{LOGFILE};
 
 		$args{flow}->();
 	};
@@ -208,9 +374,15 @@ sub one_of ($)
 
 Specify a logfile for the output of a command.
 
+=head2 control_via
+
+Specify a control structure.  This is where you put pidfile, statusfile, etc.
+
 =cut
 
 sub log_to ($) { log_to => shift }
+
+sub control_via ($) { control => shift }
 
 
 =head2 flow
@@ -281,6 +453,7 @@ sub fatal
 	my ($self, $msg) = &_pb_args;
 	my $me = $FLOW{ME} // basename($0);
 	say STDERR "$me: $msg";
+	$EXIT_STATUS = $msg unless $EXIT_STATUS eq 'NOSAVE';
 	exit 1;
 }
 
