@@ -21,6 +21,11 @@ my $test_cmd = <<'END';
 		SH echo => "second line";
 	};
 
+	command nested => flow
+	{
+		RUN 'ptest';
+	};
+
 	Pb->go;
 END
 $test_cmd =~ s/%%/$logfile/g;
@@ -39,6 +44,9 @@ unlink $logfile;
 check_output pb_run('--pretend', 'ptest'), (map { "would run: echo $_" } @lines), "basic pretend mode: good output";
 $log = _slurp($logfile);
 is $log, undef, "basic pretend mode: no execution";
+
+# nested flows should inherit the context, including the runmode
+check_output pb_run('--pretend', 'nested'), (map { "would run: echo $_" } @lines), "pretend mode for nested: good output";
 
 
 done_testing;

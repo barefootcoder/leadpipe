@@ -11,7 +11,7 @@ our @EXPORT =
 (
 	qw< command log_to control_via flow >,			# structure of the command itself
 	qw< arg must_be one_of >,						# for declaring command arguments
-	qw< verify SH >,								# keywords inside a flow
+	qw< verify SH RUN >,							# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
 
@@ -80,6 +80,9 @@ option pretend =>
 ###############
 # SCAFFOLDING #
 ###############
+
+# this will hold all the different flows
+my %FLOWS;
 
 sub _expand_vars
 {
@@ -291,6 +294,23 @@ sub command
 		}
 	}
 
+	# Save the flow (including processing any args) under our name.  Doing args here rather than in
+	# the `$subcmd` below enables the `RUN` directive to pass args as well.
+	$FLOWS{$name} = sub
+	{
+		foreach (@_)
+		{
+			my $argdef = shift @$argdefs;
+			unless ($argdef->{type}->check($_))
+			{
+				fatal("arg $argdef->{name} fails validation [" . $argdef->{type}->validate($_) . "]");
+			}
+			$FLOW{$argdef->{name}} = $_;
+		}
+
+		$args{flow}->();
+	};
+
 	my $context = {};								# need a `my` var for the closure
 	foreach ( keys %$CONTEXT_VAR_XLATE )
 	{
@@ -305,8 +325,9 @@ sub command
 
 		# I would `local`ize this, but it doesn't seem to work; not sure if that's because of the
 		# closure or because of the export (or some combination thereof).  But it shouldn't matter
-		# anyway because, on any given run of the program, exactly one flow gets executed and then
-		# the program exits.  So (at least currently) it doesn't matter that we're essentially
+		# anyway because, on any given run of the program, exactly one (master) flow gets executed
+		# and then the program exits.  (Subflows can be executed by the master, but they always use
+		# the same context.)  So (at least currently) it doesn't matter that we're essentially
 		# overwriting the default context container.
 		%FLOW = (%FLOW, %$context);
 		# clients may use these
@@ -315,21 +336,11 @@ sub command
 		# these are for internal use
 		$FLOW{':RUNMODE'} = _extrapolate_run_mode();					# more like this set by `_process_control_structure`
 
-		# process args (note that switches would have already been processed by Osprey)
-		foreach (@$argdefs)
-		{
-			my $arg = shift @ARGV;
-			unless ($_->{type}->check($arg))
-			{
-				fatal("arg $_->{name} fails validation [" . $_->{type}->validate($arg) . "]");
-			}
-			$FLOW{$_->{name}} = $arg;
-		}
-
 		_process_control_structure($name);
 		$FLOW{LOGFILE} = _prep_filename($FLOW{LOGFILE}) if exists $FLOW{LOGFILE};
 
-		$args{flow}->();
+		# Script args are flow args (switches were already processed by Osprey).
+		$FLOWS{$name}->(@ARGV);
 	};
 	subcommand $name => $subcmd;
 }
@@ -435,6 +446,19 @@ sub SH (@)
 	{
 		fatal("command [@_] exited non-zero [$exitval]");
 	}
+}
+
+=head2 RUN
+
+Run one command inside another.  Although you pass the nested command its own arguments, all other
+parts of the context (including options) are retained.
+
+=cut
+
+sub RUN (@)
+{
+	my ($flow, @args) = @_;
+	$FLOWS{$flow}->(@args);
 }
 
 
