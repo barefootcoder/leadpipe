@@ -144,6 +144,33 @@ sub _safe_file_rw
 }
 
 
+# This sets (almost) all the flow context variables.
+#
+# Context vars set elsewhere:
+#	*	`_process_control_structure` sets some (particularly internal ones)
+#	*	arguments are set by the simple wrapper around the main flow code
+sub _setup_context
+{
+	my ($context) = shift;
+
+	# I would `local`ize this, but it doesn't seem to work; not sure if that's because this is
+	# typically called by a closure or because `%FLOW` is exported (or some combination thereof).
+	# But it shouldn't matter anyway because, on any given run of the program, exactly one (master)
+	# flow gets executed and then the program exits.  (Subflows can be executed by the master, but
+	# they always use the same context.)  So (at least currently) it doesn't matter that we're
+	# essentially overwriting the default context container.
+	%FLOW = (%FLOW, %$context);
+	# clients may use these
+	$FLOW{TIME} = localtime($^T)->strftime("%Y%m%d%H%M%S");
+	$FLOW{DATE} = localtime($^T)->strftime("%Y%m%d");
+	# these are for internal use
+	$FLOW{':RUNMODE'} = _extrapolate_run_mode();					# more like this set by `_process_control_structure`
+
+	# this was set by `command`, but it might have context vars in it
+	$FLOW{LOGFILE} = _prep_filename($FLOW{LOGFILE}) if exists $FLOW{LOGFILE};
+}
+
+
 # This deals with all the stuff you can put in the "control structure (i.e. the hashref that follows
 # the `control_via` keyword).
 sub _process_control_structure
@@ -323,21 +350,8 @@ sub command
 		my %opts = $osprey->_osprey_options;
 		%OPT = map { $_ => $osprey->$_ } keys %opts;
 
-		# I would `local`ize this, but it doesn't seem to work; not sure if that's because of the
-		# closure or because of the export (or some combination thereof).  But it shouldn't matter
-		# anyway because, on any given run of the program, exactly one (master) flow gets executed
-		# and then the program exits.  (Subflows can be executed by the master, but they always use
-		# the same context.)  So (at least currently) it doesn't matter that we're essentially
-		# overwriting the default context container.
-		%FLOW = (%FLOW, %$context);
-		# clients may use these
-		$FLOW{TIME} = localtime($^T)->strftime("%Y%m%d%H%M%S");
-		$FLOW{DATE} = localtime($^T)->strftime("%Y%m%d");
-		# these are for internal use
-		$FLOW{':RUNMODE'} = _extrapolate_run_mode();					# more like this set by `_process_control_structure`
-
+		_setup_context($context);
 		_process_control_structure($name);
-		$FLOW{LOGFILE} = _prep_filename($FLOW{LOGFILE}) if exists $FLOW{LOGFILE};
 
 		# Script args are flow args (switches were already processed by Osprey).
 		$FLOWS{$name}->(@ARGV);
