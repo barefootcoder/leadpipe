@@ -9,8 +9,9 @@ use autodie ':all';
 use Exporter;
 our @EXPORT =
 (
-	qw< command log_to control_via flow >,			# structure of the command itself
+	qw< command base_command flow >,				# base structure of the command itself
 	qw< arg must_be one_of >,						# for declaring command arguments
+	qw< log_to control_via >,						# attributes of the command
 	qw< verify SH RUN >,							# keywords inside a flow
 	qw< %FLOW >,									# variable containers that flows need access to
 );
@@ -83,6 +84,9 @@ option pretend =>
 
 # this will hold all the different flows
 my %FLOWS;
+
+# this is for the `base_command` (if there is one)
+my $BASE_CMD;
 
 sub _expand_vars
 {
@@ -301,6 +305,7 @@ sub command
 		elsif ($_[0] eq 'arg')
 		{
 			shift;									# just the 'arg' marker
+			fatal("base commands cannot take arguments (try an option instead)") if $name eq ':DEFAULT';
 			my $arg = {};
 			$arg->{name} = shift;
 			$arg->{type} = shift;
@@ -356,8 +361,16 @@ sub command
 		# Script args are flow args (switches were already processed by Osprey).
 		$FLOWS{$name}->(@ARGV);
 	};
-	subcommand $name => $subcmd;
+	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : subcommand $name => $subcmd;
 }
+
+=head2 base_command
+
+Declare a base (i.e. default) command.
+
+=cut
+
+sub base_command { unshift @_, ':DEFAULT'; &command }
 
 
 =head2 arg
@@ -537,9 +550,6 @@ sub run
 {
 	$BASE_CMD->(@_) if $BASE_CMD;
 }
-
-# Osprey needs this internally, even though we're not using it for anything (yet).
-sub run {}
 
 sub go
 {

@@ -34,6 +34,13 @@ my $test_cmd = <<'END';
 	{
 	};
 
+	# this is what you get if you don't specify a subcommand
+	base_command
+	flow
+	{
+		SH echo => join(',', grep { defined } 'goodbye', $FLOW{name});
+	};
+
 	Pb->go;
 END
 my @commands = sort (qw< commands help info >, $test_cmd =~ /\bcommand\s+(\w+)\b/g);
@@ -49,6 +56,7 @@ check_output pb_run('commands'), @commands, "command keyword generates an Osprey
 
 check_output pb_run('dumb'), "hello", "can execute stupid-simple single-SH-directive flow";
 check_output pb_run('show_debug'), "debug state is 0", "can access flow context vars";
+check_output pb_run(), "goodbye", "can run base command";
 
 
 # Now check some things that we verify by the command _failing_.

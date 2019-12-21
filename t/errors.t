@@ -21,6 +21,21 @@ END
 check_error pb_run('explode'), 1, "bad_command: unknown command attribute [random]",
 		"`command` syntax rejects unknown elements";
 
+# `base_command` can't take args
+pb_basecmd(bad_base_command => <<'END');
+	use Pb;
+	use Types::Standard -types;
+	base_command
+		arg foo => must_be Int,
+	flow
+	{
+		say "should have died already";
+	};
+	Pb->go;
+END
+check_error pb_run(), 1, "bad_base_command: base commands cannot take arguments (try an option instead)",
+		"`base_command` syntax rejects `arg`";
+
 # unknown `arg` type
 pb_basecmd(bad_type => <<'END');
 	use Pb;
