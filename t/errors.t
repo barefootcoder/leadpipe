@@ -21,6 +21,19 @@ END
 check_error pb_run('explode'), 1, "bad_command: unknown command attribute [random]",
 		"`command` syntax rejects unknown elements";
 
+# `command` name is illegal
+pb_basecmd(bad_command => <<'END');
+	use Pb;
+	command '1llegal_name' =>
+	flow
+	{
+		say "should have died already";
+	};
+	Pb->go;
+END
+check_error pb_run(), 1, "bad_command: illegal command name [1llegal_name]",
+		"`command` syntax rejects invalid identifiers";
+
 # `base_command` can't take args
 pb_basecmd(bad_base_command => <<'END');
 	use Pb;

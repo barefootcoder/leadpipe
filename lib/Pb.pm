@@ -26,6 +26,7 @@ use Type::Tiny;
 use PerlX::bash;
 use Time::Piece;
 use Import::Into;
+use Sub::Install		qw< install_sub >;
 use File::Basename;
 
 
@@ -242,6 +243,21 @@ sub _process_control_structure
 }
 
 
+# This builds subcommands.  If it weren't for the fact that we need our subcommands to be able to
+# have their own options, we could simply do `subcommand $name => $cmd`.  However, that creates an
+# object of class CLI::Osprey::InlineSubcommand, and those can't have options. :-(
+sub _install_subcommand
+{
+	my ($name, $action) = @_;
+	my $pkg = $name =~ s/-/_/r;
+	fatal("illegal command name [$name]") if $pkg !~ /\A[a-zA-Z_][a-zA-Z0-9_]*\z/;
+	$pkg = "Pb::Subcommand::$pkg";
+	eval "package $pkg { use Moo; use CLI::Osprey; }";
+	install_sub({ code => $action, into => $pkg, as => 'run' });
+	subcommand $name => $pkg;
+}
+
+
 # This guarantees that `END` blocks are not only called when your program `exit`s or `die`s, but
 # also when it's terminated due to a signal (where possible to catch).  This is super-important for
 # things like making sure pidfiles get cleaned up.  I'm pretty sure that the only times your `END`
@@ -354,6 +370,11 @@ sub command
 		my ($osprey) = @_;
 		my %opts = $osprey->_osprey_options;
 		%OPT = map { $_ => $osprey->$_ } keys %opts;
+		# get options from top-level command as well (these are the global opts)
+		{
+			my %opts = $FLOW{':TOP'}->_osprey_options;
+			$OPT{$_} //= $FLOW{':TOP'}->$_ foreach keys %opts;
+		}
 
 		_setup_context($context);
 		_process_control_structure($name);
@@ -361,7 +382,7 @@ sub command
 		# Script args are flow args (switches were already processed by Osprey).
 		$FLOWS{$name}->(@ARGV);
 	};
-	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : subcommand $name => $subcmd;
+	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : _install_subcommand($name => $subcmd);
 }
 
 =head2 base_command
@@ -561,6 +582,7 @@ sub go
 	# subcommand or somesuch (viz. CLI::Osprey::InlineSubcommand).
 	my $top_level = $CMD;
 	$top_level = $top_level->parent_command while $top_level->can('parent_command') and $top_level->parent_command;
+	$FLOW{':TOP'} = $top_level;
 	$FLOW{ME} = $top_level->invoked_as;
 
 	$CMD->run;

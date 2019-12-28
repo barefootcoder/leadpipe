@@ -58,6 +58,18 @@ check_output pb_run('dumb'), "hello", "can execute stupid-simple single-SH-direc
 check_output pb_run('show_debug'), "debug state is 0", "can access flow context vars";
 check_output pb_run(), "goodbye", "can run base command";
 
+# `command` name is legal
+pb_basecmd(good_command => <<'END');
+	use Pb;
+	command 'legal-name' =>
+	flow
+	{
+		say "success";
+	};
+	Pb->go;
+END
+check_output pb_run('legal-name'), "success", "`command` identifiers allow dashes";
+
 
 # Now check some things that we verify by the command _failing_.
 
