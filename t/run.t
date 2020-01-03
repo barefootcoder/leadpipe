@@ -23,14 +23,14 @@ my $test_cmd = <<'END';
 		arg thing => must_be Str,
 	flow
 	{
-		say $FLOW{thing};
+		say $FLOW->{thing};
 	};
 
 	command nested =>
 		arg flow => must_be Str,
 	flow
 	{
-		RUN $FLOW{flow};
+		RUN $FLOW->{flow};
 	};
 
 	command do_all => flow

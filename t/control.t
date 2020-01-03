@@ -31,7 +31,7 @@ $test_cmd = <<'END';
 	my %dispatch =
 	(
 		hang		=>	sub {	sleep 300;							},
-		pidfile		=>	sub {	say $FLOW{':PIDFILE'}->pidfile;		},
+		pidfile		=>	sub {	say $FLOW->pidfile;					},
 		testfail	=>	sub {	die("this should never happen");	},
 		dirty_exit	=>	sub {	SH exit => 33;						},
 		nothing		=>	sub {	;									},
@@ -48,7 +48,7 @@ $test_cmd = <<'END';
 		},
 	flow
 	{
-		$dispatch{ $FLOW{action} }->();
+		$dispatch{ $FLOW->{action} }->();
 	};
 
 	Pb->go;

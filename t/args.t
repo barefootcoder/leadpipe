@@ -16,7 +16,7 @@ pb_basecmd(flowvar => <<'END');
 		arg foo => must_be Int,
 	flow
 	{
-		say "arg is $FLOW{foo}";
+		say "arg is $FLOW->{foo}";
 	};
 	Pb->go;
 END
@@ -31,7 +31,7 @@ pb_basecmd(multiple => <<'END');
 		arg bar => must_be Str,
 	flow
 	{
-		say "args: $FLOW{foo}$FLOW{bar}";
+		say "args: $FLOW->{foo}$FLOW->{bar}";
 	};
 	Pb->go;
 END
@@ -44,7 +44,7 @@ pb_basecmd(typename => <<'END');
 		arg foo => must_be 'Int',
 	flow
 	{
-		say "arg is $FLOW{foo}";
+		say "arg is $FLOW->{foo}";
 	};
 	Pb->go;
 END
@@ -57,7 +57,7 @@ pb_basecmd(typename => <<'END');
 		arg foo => one_of [qw< a b c >],
 	flow
 	{
-		say "arg is $FLOW{foo}";
+		say "arg is $FLOW->{foo}";
 	};
 	Pb->go;
 END

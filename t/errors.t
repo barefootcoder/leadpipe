@@ -198,7 +198,8 @@ pb_basecmd(bad_file_write => <<'END');
 	use Pb;
 	command explode => flow
 	{
-		Pb::_safe_file_rw("/cant/possibly/exist", "boom");
+		$FLOW->_safe_file_rw("/cant/possibly/exist", "boom");
+		Pb::fatal($FLOW->error) if $FLOW->error;
 	};
 	Pb->go;
 END
@@ -211,8 +212,8 @@ pb_basecmd(bad_file_write => <<'END');
 	use Pb;
 	command no_explode => flow
 	{
-		my $content = Pb::_safe_file_rw("/cant/possibly/exist");
-		say $content // '<<undef>>';
+		my $content = $FLOW->_safe_file_rw("/cant/possibly/exist");
+		say $content // $FLOW->error // '<<undef>>';
 	};
 	Pb->go;
 END

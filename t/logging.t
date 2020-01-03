@@ -17,17 +17,17 @@ my $test_cmd = <<'END';
 		log_to '%%/some/other/file',
 	flow
 	{
-		say $FLOW{LOGFILE};
+		say $FLOW->{LOGFILE};
 	};
 
 	command get_logfile1 =>
 		log_to '%%/some/file',
 	flow
 	{
-		say $FLOW{LOGFILE};
+		say $FLOW->{LOGFILE};
 
 		# verify that our logfile's dir gets created
-		-d '%%/some' or die("failed to create parent dir for our logfile");
+		-d '%%/some' or die("failed to create parent dir for our logfile [%%/some]");
 		# and that the logfile dir of other commands _don't_
 		not -d '%%/some/other' or die("created parent log dir for the wrong command");
 
@@ -40,15 +40,15 @@ my $test_cmd = <<'END';
 		log_to '%%/log-%ME',
 	flow
 	{
-		say $FLOW{LOGFILE};
+		say $FLOW->{LOGFILE};
 	};
 
 	command timestamped =>
 		log_to '%%/log-%TIME',
 	flow
 	{
-		die("not getting timestamp in logfile name! [$FLOW{LOGFILE}]")
-				unless $FLOW{LOGFILE} eq '%%/log-' . localtime($^T)->strftime("%Y%m%d%H%M%S");
+		die("not getting timestamp in logfile name! [$FLOW->{LOGFILE}]")
+				unless $FLOW->{LOGFILE} eq '%%/log-' . localtime($^T)->strftime("%Y%m%d%H%M%S");
 		say "works";
 	};
 
@@ -56,8 +56,8 @@ my $test_cmd = <<'END';
 		log_to '%%/log-%DATE',
 	flow
 	{
-		die("not getting date in logfile name! [$FLOW{LOGFILE}]")
-				unless $FLOW{LOGFILE} eq '%%/log-' . localtime($^T)->strftime("%Y%m%d");
+		die("not getting date in logfile name! [$FLOW->{LOGFILE}]")
+				unless $FLOW->{LOGFILE} eq '%%/log-' . localtime($^T)->strftime("%Y%m%d");
 		say "works";
 	};
 

@@ -16,8 +16,8 @@ my $test_cmd = <<'END';
 
 	command show_debug => flow
 	{
-		verify { not $FLOW{DEBUG} } 'debug starting from fresh "off" state';
-		say "debug state is ", $FLOW{DEBUG};
+		verify { not $FLOW->{DEBUG} } 'debug starting from fresh "off" state';
+		say "debug state is ", $FLOW->{DEBUG};
 	};
 
 	# these are just to verify that commands have a flexible syntax
@@ -38,7 +38,7 @@ my $test_cmd = <<'END';
 	base_command
 	flow
 	{
-		SH echo => join(',', grep { defined } 'goodbye', $FLOW{name});
+		SH echo => join(',', grep { defined } 'goodbye', $FLOW->{name});
 	};
 
 	Pb->go;
@@ -51,7 +51,7 @@ pb_basecmd(test_pb => $test_cmd);
 # 	*	modern Perl syntax such as `use strict` and `say`
 # 	*	Pb keywords such as `command` and `flow`
 # 	*	Pb directives such as `SH`
-# 	*	Pb variable containers such as `%FLOW`
+# 	*	Pb containers such as `$FLOW`
 check_output pb_run('commands'), @commands, "command keyword generates an Osprey subcommand";
 
 check_output pb_run('dumb'), "hello", "can execute stupid-simple single-SH-directive flow";
