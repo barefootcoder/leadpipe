@@ -10,10 +10,10 @@ use Exporter;
 our @EXPORT =
 (
 	qw< command base_command flow >,				# base structure of the command itself
-	qw< arg must_be one_of >,						# for declaring command arguments
+	qw< arg opt must_be one_of also >,				# for declaring command arguments and options
 	qw< log_to control_via >,						# attributes of the command
 	qw< verify SH RUN >,							# keywords inside a flow
-	qw< $FLOW >,									# variable containers that flows need access to
+	qw< $FLOW %OPT >,								# variable containers that flows need access to
 );
 
 use Moo;
@@ -87,12 +87,26 @@ my $BASE_CMD;
 # object of class CLI::Osprey::InlineSubcommand, and those can't have options. :-(
 sub _install_subcommand
 {
-	my ($name, $action) = @_;
+	my ($name, $action, $optdefs) = @_;
 	my $pkg = $name =~ s/-/_/r;
 	fatal("illegal command name [$name]") if $pkg !~ /\A[a-zA-Z_][a-zA-Z0-9_]*\z/;
 	$pkg = "Pb::Subcommand::$pkg";
 	eval "package $pkg { use Moo; use CLI::Osprey; }";
 	install_sub({ code => $action, into => $pkg, as => 'run' });
+
+	# handle options
+	my $option = $pkg->can('option') // die("Can't install options into subcommand package! [$name]");
+	foreach (@$optdefs)
+	{
+		my %props = ( is => 'ro' );
+		unless ( $_->{type}->is_a_type_of('Bool') )
+		{
+			$props{format} = 's';
+		}
+		$option->( $_->{name} => %props );
+	}
+
+	# NOTE: can pass a `desc =>` to the `subcommand` (useful for help?)
 	subcommand $name => $pkg;
 }
 
@@ -157,6 +171,7 @@ sub command
 	# these are all used in the closure below
 	my %args;										# arguments to this command definition
 	my $argdefs = [];								# definition of args to the command invocation
+	my $optdefs = [];								# definition of opts to the command invocation
 	# process args: most are simple, some are trickier
 	while (@_)
 	{
@@ -176,6 +191,20 @@ sub command
 					unless $arg->{type}->$_isa('Type::Tiny');
 			push @$argdefs, $arg;
 		}
+		elsif ($_[0] eq 'opt')
+		{
+			shift;									# just the 'opt' marker
+			my $opt = {};
+			$opt->{name} = shift;
+			$opt->{type} = $_[0]->$_isa('Type::Tiny') ? shift : must_be('Bool');
+			if ($_[0] eq 'properties')
+			{
+				shift;
+				my $extra_props = shift;
+				$opt->{$_} = $extra_props->{$_} foreach keys %$extra_props;
+			}
+			push @$optdefs, $opt;
+		}
 		elsif ($_[0] eq 'control')
 		{
 			shift;									# just the 'control' marker
@@ -193,16 +222,8 @@ sub command
 	# the `$subcmd` below enables the `RUN` directive to pass args as well.
 	$FLOWS{$name} = sub
 	{
-		foreach (@_)
-		{
-			my $argdef = shift @$argdefs;
-			unless ($argdef->{type}->check($_))
-			{
-				fatal("arg $argdef->{name} fails validation [" . $argdef->{type}->validate($_) . "]");
-			}
-			$FLOW->set_var($argdef->{name}, $_);
-		}
-
+		$FLOW->validate_args(@_, $argdefs);
+		fatal($FLOW->error) if $FLOW->error;
 		$args{flow}->();
 	};
 
@@ -218,10 +239,11 @@ sub command
 			$context_vars->{$_} = $args{$arg} if exists $args{$arg};
 		}
 
-		# Build the context for this command based on the (skeletal) global one, adding in new
-		# context vars from our `command` definition and processing the control structure.
-		my $context = $FLOW->setup_context($context_vars, $CONTROL{$name});
-		if ($context->error)						# the control structure had an error
+		# Build the context for this command based on the (skeletal) global one, doing 3 major
+		# things: adding in new context vars from our `command` definition, validing any
+		# command-specific opts, and processing the control structure (if any).
+		my $context = $FLOW->setup_context($context_vars, $optdefs, $CONTROL{$name});
+		if ($context->error)						# either an opt didn't validate or the control structure had an error
 		{
 			fatal($context->error);
 		}
@@ -231,10 +253,10 @@ sub command
 			%OPT  = $FLOW->opts;
 		}
 
-		# Script args are flow args (switches were already processed by Osprey).
+		# Script args are flow args (switches were already processed by Osprey and validated above).
 		$FLOWS{$name}->(@ARGV);
 	};
-	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : _install_subcommand($name => $subcmd);
+	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : _install_subcommand($name => $subcmd, $optdefs);
 }
 
 =head2 base_command
@@ -250,6 +272,10 @@ sub base_command { unshift @_, ':DEFAULT'; &command }
 
 Declare an argument to a command.
 
+=head2 opt
+
+Declare an option to a command.
+
 =head2 must_be
 
 Specify the type (of either an argument or option).
@@ -259,9 +285,15 @@ Specify the type (of either an argument or option).
 Specify the valid values for an enum type (for either an argument or option).  Use I<instead of>
 C<must_be>, not in addition to.
 
+=head2 also
+
+Specify additional properties (other than type) for an option.
+
 =cut
 
 sub arg ($) { arg => shift }
+
+sub opt (@) { opt => @_ }
 
 sub must_be ($)
 {
@@ -279,6 +311,8 @@ sub one_of ($)
 	my $v = shift;
 	Type::Tiny::Enum->new( values => $v, message => sub { ($_ // '<<undef>>') . " must be one of: " . join(', ', @$v) });
 }
+
+sub also { properties => { map { s/^-// ? ($_ => 1) : $_ } @_ } }
 
 
 =head2 log_to

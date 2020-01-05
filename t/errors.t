@@ -162,6 +162,49 @@ check_error pb_run('explode', "x"), 1, "argfail: arg foo fails validation [x mus
 		"can validate arg list";
 
 
+# OPERATIONAL FAILURES (options)
+
+# `opt` failure to validate type
+pb_basecmd(optfail => <<'END');
+	use Pb;
+	use Types::Standard -types;
+	command explode =>
+		opt foo => must_be Int,
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', '--foo', "x"), 1, "optfail: opt foo fails validation [x is not a Int]",
+		"can validate opt type";
+
+# `opt` failure to validate type as string
+pb_basecmd(optfail => <<'END');
+	use Pb;
+	command explode =>
+		opt foo => must_be 'Int',
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', '--foo', "x"), 1, "optfail: opt foo fails validation [x is not a Int]",
+		"can validate opt typestring";
+
+# `opt` failure to validate one of a given list
+pb_basecmd(optfail => <<'END');
+	use Pb;
+	command explode =>
+		opt foo => one_of [qw< a b c >],
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode', '--foo', "x"), 1, "optfail: opt foo fails validation [x must be one of: a, b, c]",
+		"can validate opt list";
+
+
 # OPERATIONAL FAILURES (other)
 
 # `verify` failure

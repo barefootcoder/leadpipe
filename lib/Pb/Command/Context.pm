@@ -196,11 +196,15 @@ context variables, option definitions, and a control structure.
 
 sub setup_context
 {
-	my ($inv, $vars, $control) = @_;
+	my ($inv, $vars, $optdefs, $control) = @_;
 	my $self = ref $inv ? $inv->clone : $inv->new;
 
 	# set whatever vars weren't already set
 	$self->set_var($_ => $vars->{$_}) foreach keys %$vars;
+
+	# validate opts (this might also set some vars)
+	$self->validate_opts($optdefs);
+	return $self if $self->error;					# no point in continuing if an opt was bobbled
 
 	# have to do this at runtime so that we only create a logfile for the running command
 	$self->prep_logfile;
@@ -312,6 +316,65 @@ sub _parse_opts
 		# I'm pretty sure the top-level command will always have an options method.
 		my %opt_objects = $self->toplevel_command->$optobj_method;
 		$self->_opts->{$_} //= $self->toplevel_command->$_ foreach keys %opt_objects;
+	}
+}
+
+
+=head2 validate_args
+
+Loop through arguments (passed in) and validate that they all pass type constraints (also passed
+in).  As a side effect, set each argument as a context var.
+
+=cut
+
+sub validate_args
+{
+	my $defs = pop;
+	my ($self, @args) = @_;
+
+	foreach my $def (@$defs)
+	{
+		my $arg = shift @args;
+		return undef unless $self->_validate_value(arg => $def->{type}, $def->{name} => $arg);
+		$self->set_var($def->{name}, $arg);
+	}
+	return 1;
+}
+
+=head2 validate_opts
+
+Loop through options (already present in the context) and validate that they all pass type
+constraints (passed in).
+
+=cut
+
+sub validate_opts
+{
+	my ($self, $defs) = @_;
+
+	foreach my $def (@$defs)
+	{
+		my $opt = $self->_opts->{ $def->{name} };
+		return undef unless $self->_validate_value(opt => $def->{type}, $def->{name} => $opt);
+		# unlike args, opts only get saved as context vars upon request
+		$self->set_var($def->{name}, $opt) if $def->{access_as_var};
+	}
+	return 1;
+}
+
+# Consolidate error message into a private method for consistency.
+sub _validate_value
+{
+	my ($self, $thing, $type, $name, $value) = @_;
+
+	if ($type->check($value))
+	{
+		return 1;
+	}
+	else
+	{
+		$self->raise_error("$thing $name fails validation [" . $type->validate($value) . "]");
+		return undef;
 	}
 }
 
