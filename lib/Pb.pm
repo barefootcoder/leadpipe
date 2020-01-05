@@ -208,8 +208,7 @@ sub command
 
 	my $subcmd = sub
 	{
-		my ($osprey) = @_;
-		%OPT = $FLOW->parse_opts($osprey);
+		my ($osprey) = @_;							# currently unused
 
 		# Figure out what context vars we need to set based on our the `command` properties.
 		my $context_vars = {};
@@ -221,14 +220,15 @@ sub command
 
 		# Build the context for this command based on the (skeletal) global one, adding in new
 		# context vars from our `command` definition and processing the control structure.
-		my $context = $FLOW->setup_context($context_vars, \%OPT, $CONTROL{$name});
-		if ($context->error)						# either an opt didn't validate or the control structure had an error
+		my $context = $FLOW->setup_context($context_vars, $CONTROL{$name});
+		if ($context->error)						# the control structure had an error
 		{
 			fatal($context->error);
 		}
 		else										# set global access vars for flows
 		{
 			$FLOW = $context;
+			%OPT  = $FLOW->opts;
 		}
 
 		# Script args are flow args (switches were already processed by Osprey).

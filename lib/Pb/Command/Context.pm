@@ -41,6 +41,9 @@ my  $CLEAN_EXIT = 'exited cleanly';
 # These are the actual context vars that flows can access via hash deferencing.
 has _vars 	=> (	is => 'ro', default => sub { +{%DEFAULT_CONTEXT} }, handles_via => 'Hash',
 					handles => { var => 'get', has_var => 'exists', }, );
+# These are the options (both command-specific and global) for the running command.
+has _opts 	=> (	is => 'ro', default => sub { +{                } }, handles_via => 'Hash',
+					handles => { opt => 'get', opts => 'elements', }, );
 
 # The `@RAW_ACCESS` lists packages that are allowed to access our internals directly.  Everyone else
 # who treats us like a hash reference gets the hash of context vars instead.  This is how we get
@@ -105,8 +108,8 @@ sub _prep_filename
 
 sub _extrapolate_run_mode
 {
-	my ($self, %opts) = @_;
-	return 'NOACTION' if $opts{pretend};
+	my ($self) = @_;
+	return 'NOACTION' if $self->_opts->{pretend};
 	return 'ACTION';
 }
 
@@ -193,7 +196,7 @@ context variables, option definitions, and a control structure.
 
 sub setup_context
 {
-	my ($inv, $vars, $opts, $control) = @_;
+	my ($inv, $vars, $control) = @_;
 	my $self = ref $inv ? $inv->clone : $inv->new;
 
 	# set whatever vars weren't already set
@@ -202,7 +205,7 @@ sub setup_context
 	# have to do this at runtime so that we only create a logfile for the running command
 	$self->prep_logfile;
 	# have to this at run time so we have parsed options to work with
-	$self->_set_runmode( $self->_extrapolate_run_mode(%$opts) );
+	$self->_set_runmode( $self->_extrapolate_run_mode );
 
 	# process control stuff; some of this might mean we have to bail out
 	unless ( $self->_process_control_structure($control) )
@@ -294,6 +297,22 @@ sub connect_to
 
 	$self->_set_toplevel_command($top_level);
 	$self->_vars->{ME} = $top_level->invoked_as;
+	$self->_parse_opts($command);
+}
+
+# Build the options hash.  Merges both local and global opts.
+sub _parse_opts
+{
+	my ($self, $command) = @_;
+	my $optobj_method = '_osprey_options';
+	my %opt_objects = $command->can($optobj_method) ? $command->$optobj_method : ();
+	$self->_opts->{$_} = $command->$_ foreach keys %opt_objects;
+	# get options from top-level command as well (these are the global opts)
+	{
+		# I'm pretty sure the top-level command will always have an options method.
+		my %opt_objects = $self->toplevel_command->$optobj_method;
+		$self->_opts->{$_} //= $self->toplevel_command->$_ foreach keys %opt_objects;
+	}
 }
 
 
@@ -341,21 +360,6 @@ sub prep_pidfile
 		}
 	}
 	return 1;
-}
-
-
-# Get the command options, as a hash.  Merges both local and global opts.
-sub parse_opts
-{
-	my ($self, $command) = @_;
-	my %opt_objects = $command->_osprey_options;
-	my %opts = map { $_ => $command->$_ } keys %opt_objects;
-	# get options from top-level command as well (these are the global opts)
-	{
-		my %opt_objects = $self->toplevel_command->_osprey_options;
-		$opts{$_} //= $self->toplevel_command->$_ foreach keys %opt_objects;
-	}
-	return %opts;
 }
 
 
