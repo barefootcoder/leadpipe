@@ -14,6 +14,7 @@ our @EXPORT =
 	qw< log_to control_via >,						# attributes of the command
 	qw< verify SH RUN >,							# keywords inside a flow
 	qw< $FLOW %OPT >,								# variable containers that flows need access to
+	qw< pwd >,										# pass-through from PerlX::bash
 );
 
 use Moo;
@@ -21,7 +22,7 @@ use CLI::Osprey;
 
 use Safe::Isa;
 use Type::Tiny;
-use PerlX::bash;
+use PerlX::bash			qw< bash pwd >;
 use Import::Into;
 use Sub::Install		qw< install_sub >;
 use File::Basename;
