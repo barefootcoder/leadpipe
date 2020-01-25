@@ -91,7 +91,7 @@ sub _set_logfile	{ my ($self, $file) = @_; $self->_vars->{LOGFILE} = $file;     
 sub _expand_vars
 {
 	my ($self, $string) = @_;
-	$string =~ s/%(\w+)/$self->_vars->{$1}/ge;
+	$string =~ s{%(\w+)}{ $self->_vars->{$1} // $self->raise_error("variable $1 used in expansion but never defined") }ge;
 	return $string;
 }
 

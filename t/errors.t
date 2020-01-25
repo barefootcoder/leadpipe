@@ -189,6 +189,19 @@ END
 check_error pb_run('explode'), 1, "sh_dirty_exit: command [exit 33] exited non-zero [33]",
 		"`SH` calls `fatal` on dirty exit";
 
+# variable accessed but not passed in
+pb_basecmd(varfail => <<'END');
+	use Pb;
+	command explode =>
+		log_to => '/tmp/%bmoogle.log',
+	flow
+	{
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "varfail: variable bmoogle used in expansion but never defined",
+		"intelligent error message for failure to expand context var";
+
 
 # LOW-LEVEL OPS FAILURES
 # (these can be tricky to simulate, so we're calling private functions directly)
