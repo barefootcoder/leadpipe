@@ -92,6 +92,20 @@ pb_basecmd(typename => <<'END');
 END
 check_output pb_run('show', '--foo', 'b'), "opt is b", "opt type can be specified with list";
 
+# base commands should be able to have opts too
+pb_basecmd(flowvar => <<'END');
+	use Pb;
+	use Types::Standard -types;
+	base_command
+		opt foo => must_be Int,
+	flow
+	{
+		say "opt is $OPT{foo}";
+	};
+	Pb->go;
+END
+check_output pb_run('--foo', 33), "opt is 33", "base_command can take an opt";
+
 
 # OPTION PROPERTIES
 

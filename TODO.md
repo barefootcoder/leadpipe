@@ -67,3 +67,6 @@ list below is not in any particular order.
   (i.e. there's already a variable with the same name as the option).  This
   should definitely be an error or else really hard-to-debug errors will likely
   result.
+* There seems to be some sort of problem with Osprey's handling of unknown
+  options.  I keep seeing this error message: `Can't locate object method
+  \"die\" via package \"CLI::Osprey::Descriptive::Usage\"`

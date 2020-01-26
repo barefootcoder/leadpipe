@@ -82,6 +82,20 @@ my %FLOWS;
 # this is for the `base_command` (if there is one)
 my $BASE_CMD;
 
+
+# This takes an option def (i.e. a hashref built from the properties of an `opt` clause) and turns
+# it into the arguments to an `option` call (`option` is defined by CLI::Osprey).
+sub _option_args
+{
+	my $def = shift;
+	my %props = ( is => 'ro' );
+	unless ( $def->{type}->is_a_type_of('Bool') )
+	{
+		$props{format} = 's';
+	}
+	return $def->{name} => %props;
+}
+
 # This builds subcommands.  If it weren't for the fact that we need our subcommands to be able to
 # have their own options, we could simply do `subcommand $name => $cmd`.  However, that creates an
 # object of class CLI::Osprey::InlineSubcommand, and those can't have options. :-(
@@ -96,18 +110,18 @@ sub _install_subcommand
 
 	# handle options
 	my $option = $pkg->can('option') // die("Can't install options into subcommand package! [$name]");
-	foreach (@$optdefs)
-	{
-		my %props = ( is => 'ro' );
-		unless ( $_->{type}->is_a_type_of('Bool') )
-		{
-			$props{format} = 's';
-		}
-		$option->( $_->{name} => %props );
-	}
+	$option->( _option_args($_) ) foreach @$optdefs;
 
 	# NOTE: can pass a `desc =>` to the `subcommand` (useful for help?)
 	subcommand $name => $pkg;
+}
+
+# This build the "base command," which is really just the default subcommand.
+sub _install_base_command
+{
+	my ($action, $optdefs) = @_;
+	option( _option_args($_) ) foreach @$optdefs;
+	$BASE_CMD = $action;
 }
 
 
@@ -256,7 +270,7 @@ sub command
 		# Script args are flow args (switches were already processed by Osprey and validated above).
 		$FLOWS{$name}->(@ARGV);
 	};
-	$name eq ':DEFAULT' ? ($BASE_CMD = $subcmd) : _install_subcommand($name => $subcmd, $optdefs);
+	$name eq ':DEFAULT' ? _install_base_command($subcmd, $optdefs) : _install_subcommand($name => $subcmd, $optdefs);
 }
 
 =head2 base_command
