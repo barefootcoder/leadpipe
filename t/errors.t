@@ -4,6 +4,8 @@ use File::Basename;
 use lib dirname($0);
 use Test::Pb::Bin;
 
+use File::Temp;
+
 
 # SYNTACTICAL FAILURES
 
@@ -86,21 +88,29 @@ END
 check_error pb_run('explode'), 1, "bad_control: `control_via' requires hashref", "control_via checks arg";
 
 # control structure with illegal keys
-pb_basecmd(bad_control => <<'END');
+my $statfile = File::Temp->new( TMPDIR => 1 ); close $statfile;			# again, just like Path::Tiny::tempfile
+# File::Temp will have created it, but we want to see if our command will create it, so start fresh.
+unlink($statfile);
+my $test_cmd = <<'END';
 	use Pb;
 	command explode =>
 		control_via
 		{
 			bmoogle => 1,
 			frobnobdicate => 1,
+			statusfile => '%%',
 		},
 	flow
 	{
 	};
 	Pb->go;
 END
+$test_cmd =~ s/%%/$statfile/;
+pb_basecmd(bad_control => $test_cmd);
 check_error pb_run('explode'), 1, "bad_control: unknown parameter(s) in control structure [bmoogle,frobnobdicate]",
 		"control_via verifies parameters";
+# also make sure that syntax errors are creating statusfiles
+is _slurp($statfile), undef, "syntax error doesn't goto statfile";
 
 # control structure with `unless_clean_exit` but no `statusfile`
 pb_basecmd(bad_control => <<'END');

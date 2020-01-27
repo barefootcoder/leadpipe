@@ -38,7 +38,7 @@ $test_cmd = <<'END';
 	);
 
 	command control =>
-		arg action => one_of [keys %dispatch],
+		arg action => one_of [sort keys %dispatch],
 		control_via
 		{
 			# using a subdir of the tmpdir means we're also testing that dirs get created if necessary
@@ -66,6 +66,20 @@ sub _check_statfile
 	my $timestamp = localtime =~ s/\d/\\d/gr;
 	like $status, qr/last run: \Q$_[0]\E at $timestamp/,
 			"status filename contains proper status ($_[1])";
+}
+
+# before we truly begin: certain errors should *not* trigger the creation of a statfile
+{
+	my $fail_msg;
+	# "already running" tested below
+	# `unless_clean_exit` tested below (search for "accumulate")
+	# syntax failure (`unless_clean_exit` w/o `statusfile`) tested in t/errors.t
+
+	# validation failure:
+	$fail_msg = 'arg action fails validation [bmoogle must be one of: dirty_exit, hang, nothing, pidfile, testfail]';
+	check_error pb_run(control => 'bmoogle'), "test_pb: $fail_msg", "sanity check: failed as expected";
+	is _slurp($statfile), undef, "validation failure doesn't goto statfile";
+	unlink $statfile;								# JIC the test failed, don't confound further tests
 }
 
 # first, when a statusfile is requested, a clean exit gets recorded

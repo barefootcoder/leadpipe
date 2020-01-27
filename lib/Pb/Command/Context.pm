@@ -61,7 +61,7 @@ has toplevel_command  => ( is => 'rwp', );
 
 # Do we, or do we not, update the statfile (if any) when we exit?
 has update_statfile   => ( is => 'rwp', default => 1, );
-sub dont_update_statfile { my $self = shift; $self->_set_update_statfile(0); }
+sub _dont_update_statfile { my $self = shift; $self->_set_update_statfile(0); }
 
 # pseudo-attributes
 # (Mostly context vars posing as attributes, but also some attributes' attributes.)
@@ -172,6 +172,19 @@ sub set_var   { my ($self, $var, $val) = @_; $self->_vars->{$var}  = $val   }
 
 Register a generic error.
 
+=head2 syntax_error
+
+Register a syntax error (e.g. during parsing).
+
+=head2 usage_error
+
+Register a usage error (e.g. caused by a bad argument).
+
+=head2 start_conditions_not_met
+
+Register a error which indicates that the command cannot run because the environment is not in an
+expected state.
+
 =cut
 
 # Currently, this just sets the `ERR` context var, but in the future it may do more.
@@ -179,6 +192,29 @@ sub raise_error
 {
 	my ($self, $err) = @_;
 	$self->_vars->{ERR} = $err;
+}
+
+# These are more specialized versions of `raise_error`; again, very simple to start with, but
+# there's room for expansion.
+sub syntax_error
+{
+	my ($self, $err) = @_;
+	$self->_dont_update_statfile;					# syntax errors shouldn't fire the `unless_clean_exit` condition
+	$self->raise_error($err);
+}
+sub usage_error
+{
+	my ($self, $err) = @_;
+	$self->_dont_update_statfile;					# usage errors shouldn't fire the `unless_clean_exit` condition
+	$self->raise_error($err);
+}
+sub start_conditions_not_met
+{
+	my ($self, $err) = @_;
+	# Again, since the command is not going to get run, these errors can't fire off the
+	# `unless_clean_exit` condition.
+	$self->_dont_update_statfile;
+	$self->raise_error($err);
 }
 
 
@@ -215,7 +251,7 @@ sub setup_context
 	unless ( $self->_process_control_structure($control) )
 	{
 		# this should never be necessary; `error` should always be set by `_process_control_structure`
-		$self->raise_error('Unknown error processing control structure') unless $self->error;
+		$self->syntax_error('Unknown error processing control structure') unless $self->error;
 	}
 
 	return $self;
@@ -252,7 +288,7 @@ sub _process_control_structure
 		{
 			unless (defined $self->statfile)
 			{
-				$self->raise_error("cannot specify `unless_clean_exit' without `statusfile'");
+				$self->syntax_error("cannot specify `unless_clean_exit' without `statusfile'");
 				return undef;
 			}
 			my $lastrun = $self->_safe_file_rw($self->statfile);
@@ -264,16 +300,15 @@ sub _process_control_structure
 				{
 					$self->raise_error($last_exit);						# in case our message wants to access %ERR
 					my $msg = $self->_expand_vars($value);
-					$self->raise_error($msg);							# this is the real (user-supplied) error message
-					$self->dont_update_statfile;						# don't wipe out the previous exit status; ...
-					return undef;										# ... we're just going to die here anyway
+					$self->start_conditions_not_met($msg);				# this is the real (user-supplied) error message
+					return undef;
 				}
 			}
 		}
 	}
 	if ( %$control )
 	{
-		$self->raise_error("unknown parameter(s) in control structure [" . join(',', sort keys %$control) . "]");
+		$self->syntax_error("unknown parameter(s) in control structure [" . join(',', sort keys %$control) . "]");
 		return undef;
 	}
 	else
@@ -373,7 +408,7 @@ sub _validate_value
 	}
 	else
 	{
-		$self->raise_error("$thing $name fails validation [" . $type->validate($value) . "]");
+		$self->usage_error("$thing $name fails validation [" . $type->validate($value) . "]");
 		return undef;
 	}
 }
@@ -413,9 +448,8 @@ sub prep_pidfile
 	{
 		if ( $@ =~ /already running: (\d+)/ )
 		{
-			$self->raise_error("previous instance already running [$1]");
-			$self->dont_update_statfile;			# don't wipe out the previous exit status; ...
-			return undef;							# ... we're just going to die here anyway
+			$self->start_conditions_not_met("previous instance already running [$1]");
+			return undef;
 		}
 		else
 		{
