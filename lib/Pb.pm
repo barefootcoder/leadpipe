@@ -391,9 +391,13 @@ sub SH (@)
 	push @cmd, ">>$FLOW->{LOGFILE}" if exists $FLOW->{LOGFILE};
 
 	my $exitval = bash @cmd;
-	unless ($exitval == 0)
+	if (defined wantarray)							# someone cares about our exit value
 	{
-		fatal("command [@_] exited non-zero [$exitval]");
+		return $exitval;
+	}
+	else											# just a straight `SH` directive; die unless clean exit
+	{
+		fatal("command [@_] exited non-zero [$exitval]") unless $exitval == 0;
 	}
 }
 
