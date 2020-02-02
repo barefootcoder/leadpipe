@@ -33,6 +33,7 @@ $test_cmd = <<'END';
 		hang		=>	sub {	sleep 300;							},
 		pidfile		=>	sub {	say $FLOW->pidfile;					},
 		testfail	=>	sub {	die("this should never happen");	},
+		fail_verify	=>	sub {	verify { 0 } "can't continue";		},
 		dirty_exit	=>	sub {	SH exit => 33;						},
 		nothing		=>	sub {	;									},
 	);
@@ -76,9 +77,16 @@ sub _check_statfile
 	# syntax failure (`unless_clean_exit` w/o `statusfile`) tested in t/errors.t
 
 	# validation failure:
-	$fail_msg = 'arg action fails validation [bmoogle must be one of: dirty_exit, hang, nothing, pidfile, testfail]';
+	$fail_msg = 'arg action fails validation [bmoogle must be one of: '
+			. 'dirty_exit, fail_verify, hang, nothing, pidfile, testfail]';
 	check_error pb_run(control => 'bmoogle'), "test_pb: $fail_msg", "sanity check: failed as expected";
 	is _slurp($statfile), undef, "validation failure doesn't goto statfile";
+	unlink $statfile;								# JIC the test failed, don't confound further tests
+
+	# verify failure:
+	$fail_msg = "pre-flow check failed [can't continue]";
+	check_error pb_run(control => 'fail_verify'), "test_pb: $fail_msg", "sanity check: failed as expected";
+	is _slurp($statfile), undef, "verify failure doesn't goto statfile";
 	unlink $statfile;								# JIC the test failed, don't confound further tests
 }
 

@@ -368,7 +368,18 @@ execute.  Also specify the error message if the assertion fails.
 sub verify (&$)
 {
 	my ($check, $fail_msg) = @_;
-	fatal("pre-flow check failed [$fail_msg]") unless $check->();
+
+	# we need to ensure verify code gets executed no matter what
+	my $save_runmode = $FLOW->runmode;
+	$FLOW->_set_runmode('VERIFY');
+	unless ( $check->() )
+	{
+		# Doing the error this way is a bit roundabout, but it guarantees failure here won't create
+		# a statusfile that might keep our next run from happening due to `unless_clean_exit`.
+		$FLOW->start_conditions_not_met("pre-flow check failed [$fail_msg]");
+		fatal($FLOW->error);
+	}
+	$FLOW->_set_runmode($save_runmode);
 }
 
 
@@ -388,7 +399,9 @@ sub SH (@)
 		return;
 	}
 
-	push @cmd, ">>$FLOW->{LOGFILE}" if exists $FLOW->{LOGFILE};
+	# In the rare case where `--pretend` is set but `runmode` is *not* "NOACTION," don't send our
+	# output to the logfile.
+	push @cmd, ">>$FLOW->{LOGFILE}" if exists $FLOW->{LOGFILE} and not $OPT{pretend};
 
 	my $exitval = bash @cmd;
 	if (defined wantarray)							# someone cares about our exit value

@@ -17,6 +17,7 @@ my $test_cmd = <<'END';
 		log_to '%%',
 	flow
 	{
+		verify { SH echo => "xx: verify line"; 1 } "can't fail";
 		SH echo => "sh: first line";
 		SH echo => "sh: second line";
 		CODE "pretend test" => sub { say "cd: not printed under --pretend" };
@@ -35,14 +36,14 @@ pb_basecmd(test_pb => $test_cmd);
 # first, run in standard mode
 check_output pb_run('ptest'), "sanity check: output not going to term";
 my $log = _slurp($logfile);
-my @lines = ( "sh: first line", "sh: second line", "cd: not printed under --pretend", );
+my @lines = ( "xx: verify line", "sh: first line", "sh: second line", "cd: not printed under --pretend", );
 is $log, join('', map { "$_\n" } @lines), "sanity check: output going to log";
 
 # have to remove the logfile or else output will just keep getting tacked on
 unlink $logfile;
 
 # now run in pretend mode
-my %PRETEND = ( sh => sub { "would run: echo $_" }, cd => sub { "would run code block [pretend test]" }, );
+my %PRETEND = ( xx => sub {$_}, sh => sub { "would run: echo $_" }, cd => sub { "would run code block [pretend test]" }, );
 my @pretend_lines = map { $PRETEND{ /^(..):/ && $1 }->() } @lines;
 check_output pb_run('--pretend', 'ptest'), @pretend_lines, "basic pretend mode: good output";
 $log = _slurp($logfile);
