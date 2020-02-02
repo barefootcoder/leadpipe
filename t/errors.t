@@ -242,6 +242,32 @@ END
 check_error pb_run('explode'), 1, "sh_dirty_exit: command [exit 33] exited non-zero [33]",
 		"`SH` calls `fatal` on dirty exit";
 
+# failure of a `CODE` directive (no name, defined retval)
+pb_basecmd(code_returns_false => <<'END');
+	use Pb;
+	command explode => flow
+	{
+		CODE sub { 0 };
+		SH echo => "should never get here";
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "code_returns_false: code block returned false value [0]",
+		"`CODE` calls `fatal` on false return";
+
+# failure of a `CODE` directive (name, undefined retval)
+pb_basecmd(code_returns_false => <<'END');
+	use Pb;
+	command explode => flow
+	{
+		CODE 'failure block' => sub {};
+		SH echo => "should never get here";
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "code_returns_false: code block [failure block] returned false value [undef]",
+		"`CODE` calls `fatal` (with block name) on false return";
+
 # variable accessed but not passed in
 pb_basecmd(varfail => <<'END');
 	use Pb;

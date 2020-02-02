@@ -12,7 +12,7 @@ our @EXPORT =
 	qw< command base_command flow >,				# base structure of the command itself
 	qw< arg opt must_be one_of also >,				# for declaring command arguments and options
 	qw< log_to control_via >,						# attributes of the command
-	qw< verify SH RUN >,							# keywords inside a flow
+	qw< verify SH CODE RUN >,						# keywords inside a flow
 	qw< $FLOW %OPT >,								# variable containers that flows need access to
 	qw< pwd >,										# pass-through from PerlX::bash
 );
@@ -400,6 +400,48 @@ sub SH (@)
 		fatal("command [@_] exited non-zero [$exitval]") unless $exitval == 0;
 	}
 }
+
+
+=head2 CODE
+
+Run a code block.  If the block returns a falsey value, the entire command will exit.
+
+=cut
+
+sub CODE (@)
+{
+	my $block = pop;
+	my ($name) = @_;
+
+	if ( $FLOW->runmode eq 'NOACTION' )
+	{
+		my $msg = "would run code block";
+		$msg .= " [$name]" if $name;
+		say $msg;
+		return;
+	}
+
+	# If we have a logfile, better make sure our code block is printing to it rather than STDOUT, if
+	# it prints anything.
+	my $log;
+	if ( my $logfile = $FLOW->logfile )
+	{
+		open($log, '>>', $logfile);
+	}
+
+	my $retval;
+	do
+	{
+		local *STDOUT = $log if $log;
+		$retval = $block->();
+	};
+	unless ($retval)
+	{
+		my $msg = "code block" . ($name ? " [$name]" : '') . " returned false value [" . ($retval // 'undef') . "]";
+		fatal($msg);
+	}
+}
+
 
 =head2 RUN
 

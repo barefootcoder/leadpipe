@@ -17,8 +17,9 @@ my $test_cmd = <<'END';
 		log_to '%%',
 	flow
 	{
-		SH echo => "first line";
-		SH echo => "second line";
+		SH echo => "sh: first line";
+		SH echo => "sh: second line";
+		CODE "pretend test" => sub { say "cd: not printed under --pretend" };
 	};
 
 	command nested => flow
@@ -34,19 +35,21 @@ pb_basecmd(test_pb => $test_cmd);
 # first, run in standard mode
 check_output pb_run('ptest'), "sanity check: output not going to term";
 my $log = _slurp($logfile);
-my @lines = ( "first line", "second line", );
+my @lines = ( "sh: first line", "sh: second line", "cd: not printed under --pretend", );
 is $log, join('', map { "$_\n" } @lines), "sanity check: output going to log";
 
 # have to remove the logfile or else output will just keep getting tacked on
 unlink $logfile;
 
 # now run in pretend mode
-check_output pb_run('--pretend', 'ptest'), (map { "would run: echo $_" } @lines), "basic pretend mode: good output";
+my %PRETEND = ( sh => sub { "would run: echo $_" }, cd => sub { "would run code block [pretend test]" }, );
+my @pretend_lines = map { $PRETEND{ /^(..):/ && $1 }->() } @lines;
+check_output pb_run('--pretend', 'ptest'), @pretend_lines, "basic pretend mode: good output";
 $log = _slurp($logfile);
 is $log, undef, "basic pretend mode: no execution";
 
 # nested flows should inherit the context, including the runmode
-check_output pb_run('--pretend', 'nested'), (map { "would run: echo $_" } @lines), "pretend mode for nested: good output";
+check_output pb_run('--pretend', 'nested'), @pretend_lines, "pretend mode for nested: good output";
 
 
 done_testing;
