@@ -553,13 +553,188 @@ sub go
 
 =head1 SYNOPSIS
 
+    use Pb;
+    use Types::Standard -types;
+
+    my %HOSTS =
+    (
+        integration => 'foo.mydomain.com',
+        staging     => 'bar.mydomain.com',
+        production  => 'baz.mydomain.com',
+    );
+
+    command 'push-file' =>
+        arg env  => one_of [ keys %HOSTS ],
+        arg file => must_be Str,
+    flow
+    {
+        verify { pwd eq $ENV{MY_ROOT_DIR} } 'must be run from $MY_ROOT_DIR';
+        verify { -x $FLOW->{file}         } 'file must exist';
+
+        my $host = $HOSTS{$FLOW->{env}};
+        my $from = path($FLOW->{file});
+        my $dir  = $from->dirname;
+        SH scp => -p => $from, "$host:$dir";
+        CODE sub { say "it worked!" };
+    };
+
+    Pb->go;
+
 
 =head1 DESCRIPTION
+
+If you are a devops developer--even if you're a devops developer who doesn't believe that devops is
+really a thing--you spend a bunch of your time writing control scripts.  Some of them you probably
+write in C<bash>, because job control is one of those things that C<bash> is actually good at.  A
+lot of them you probably write in Perl, because programming is one of those things that C<bash> is
+pretty terrible at.  Trying to do real programming in C<bash> is pretty horrifying, but trying to do
+job control in Perl isn't much nicer: the return value of C<system> is backwards, there's no
+equivalent to C<bash -e>, C<END> blocks don't get run if your script is dying due to a signal, and
+so on and so forth, ad inifinitum.  None of the deficiencies of Perl in this area are very
+significant on their own, but it can become death by a thousand cuts as you try to layer more and
+more devops complexity onto your Perl scripts.  In the end, if you write it in C<bash>, you'll end
+up wishing you'd written it in Perl, and if you write it in Perl, you'll say to yourselt at least
+once before it's done: man, this part would have been easier in C<bash>.
+
+Well, now you no longer need to choose.  Leadpipe takes Perl and C<bash> and glues them together to
+form C<Pb>, a module which allows you to quickly write commands which can do one or all of the
+following:
+
+=over
+
+=item *
+
+Can have subcommands (reminiscent of C<git>).
+
+=item *
+
+Can have command-line options and command-line arguments with sophisticated validation.
+
+=item *
+
+Can run pre-command verification checks to ensure a known state.
+
+=item *
+
+Can break your command down into steps (called "directives"), where each step can be printed out
+instead of performing it (in C<--pretend> mode) or performed only after verification from the user
+(in C<--interactive> mode).
+
+=item *
+
+Shell (C<SH>) directives look (mostly) just like C<bash> commands, with quoting handled for you
+easily, and you have the full range of C<bash> syntax (unlike with C<system>).
+
+=item *
+
+But you can also do code (C<CODE>) directives, which are pure Perl.
+
+=item *
+
+And run (C<RUN>) directives, which allow one subcommand to call another, retaining the environment
+and context.
+
+=item *
+
+Will abort if any individual directive fails (like C<bash -e>).
+
+=item *
+
+Can automatically log to a file.
+
+=item *
+
+Can automatically abort if a previous instance of the script is running.
+
+=item *
+
+Can save the result of the script run to a file, and (optionally) refuse to run if the previous run
+failed.  This can be useful in a cronjob situation where a run error needs to be cleared manually
+before automated runs can resume.
+
+=item *
+
+Much much more.
+
+=back
+
+Honestly, most of the things discussed above are not original to this module.  The main value of
+Leadpipe is that it glues it all together and gives you a declarative syntax that looks like Perl
+(because it is), but also looks like what you're actually doing.  Syntax is provided in a similar
+fashion to Moose (i.e. not using source filters or C<Devel::Declare> or even Perl's new(ish) keyword
+plugin API), but L<Moo> is used rather than Moose to keep startup time quick.
+
+The main functionality of Leadpipe is provided by the following modules:
+
+=over
+
+=item *
+
+L<CLI::Osprey>
+
+=item *
+
+L<Type::Tiny>
+
+=item *
+
+L<PerlX::bash>
+
+=item *
+
+L<sigtrap>
+
+=item *
+
+L<Proc::Pidfile>
+
+=back
+
+If you decide not to use Leadpipe (perhaps you don't like the glitzy syntax layer), you should
+definitely look at those other modules for whatever solution you're contemplating.
+
+
+=head1 STATUS
+
+This module is very new, although it is being actively used for small projects.  Documentation is
+skeletal and the API may change a bit before it all shakes out.  Please be cautious in adopting it
+for anything mission-critical, but I would love to get any feedback you may have from trying it out
+for your own experimental projects.
 
 
 =head1 USAGE
 
+Doing C<use Pb> gets you all the syntax above, plus the following global(ish) variables:
+
+=over
+
+=item C<$FLOW>
+
+This is the L<Pb::Command::Context> for the currently running command.  Context variables (including
+arguments) can be accessed as if C<$FLOW> were a hashref (e.g. C<< $FLOW->{file} >>), but it's
+really an object with proper methods (e.g. C<< $FLOW->error >>).
+
+=item C<%OPT>
+
+This is the hash which contains the values of all options to the command (e.g. C<$OPT{pretend}>).
+
+=back
+
+You also get these functions passed through from L<PerlX::bash>:
+
+=over
+
+=item C<pwd>
+
+Same as L<Cwd/cwd>.
+
+=back
+
+
 
 =head1 BUGS, CAVEATS and NOTES
+
+Probably lots.  Check out C<TODO.md> in the distribution for things that are in the queue to be
+done.
 
 =cut
