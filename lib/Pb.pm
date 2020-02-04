@@ -521,6 +521,7 @@ subcommand info => sub
 
 	run
 	go
+	pretend
 
 =end Pod::Coverage
 

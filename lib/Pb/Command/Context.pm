@@ -35,6 +35,27 @@ my  $CLEAN_EXIT = 'exited cleanly';
 
 =head1 ATTRIBUTES
 
+=head2 runmode
+
+Whether commands are printed or not then executed or not.
+
+=head2 statfile
+
+Status file for the command (if any).
+
+=head2 proc_pidfile
+
+L<Proc::Pidfile> object for the command (if any).
+
+=head2 toplevel_command
+
+L<CLI::Osprey> object for the (ultimate) parent of the current command.  (If the command has no
+parent, C<toplevel_command> is just the current command.)
+
+=head2 update_statfile
+
+Whether or not to update the L</statfile> for the current error.
+
 =cut
 
 

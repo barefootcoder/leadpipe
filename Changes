@@ -2,6 +2,9 @@ Revision history for Pb
 
 {{$NEXT}}
 
+    [Docs]
+    * Document more subs to make newer Pod::Coverage happy
+
     [Distro Fixes]
     * Fix failing unit test due to `autodie` causing different exit values
       (thx CPAN Testers)
