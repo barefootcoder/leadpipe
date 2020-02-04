@@ -88,7 +88,7 @@ sub check_error
 {
 	my $testname = pop;
 	my $trap = shift;
-	my $exit = $_[0] =~ /^\d+$/ ? shift : 1;
+	my $exit = $_[0] =~ /^\d+$/ ? shift : $_[0] eq '?' ? (shift, qr/[12]\d*/) : 1;
 	my @lines = @_;
 	local $Test::Builder::Level = $Test::Builder::Level + 1;
 
