@@ -92,6 +92,9 @@ sub check_error
 	my @lines = @_;
 	local $Test::Builder::Level = $Test::Builder::Level + 1;
 
+    # make sure our errors come back in English, as that's what our @lines will be
+    local $ENV{LC_ALL} = 'C';
+
 	subtest $testname => sub
 	{
 		local $Test::Builder::Level = $Test::Builder::Level + 5;		# `5` determined by good ol' trial and error ...
