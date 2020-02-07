@@ -77,3 +77,6 @@ list below is not in any particular order.
 * The `STDERR` of a `CODE` block isn't currently logged to the logfile.  That
   seems pretty problematic.  (Verify that `STDERR` is also being handled
   appropriately by `SH` directives.)
+* Failure to supply a required argument gives you an error, because `undef`
+  fails the validation check.  But the error should say that you failed to
+  supply a required argument (duh).
