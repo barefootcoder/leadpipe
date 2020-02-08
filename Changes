@@ -4,6 +4,7 @@ Revision history for Pb
 
     [New Features]
     * Now catching `die` inside a `CODE` directive (with appropriate error)
+    * STDERR now also goes to logfile (if any)
 
 0.01_03   2020-02-07 16:50:28-08:00 America/Los_Angeles (TRIAL RELEASE)
 

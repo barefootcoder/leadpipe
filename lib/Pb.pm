@@ -22,9 +22,9 @@ use CLI::Osprey;
 
 use Safe::Isa;
 use Type::Tiny;
-use PerlX::bash			qw< bash pwd >;
+use PerlX::bash			0.05	qw< bash pwd >;
 use Import::Into;
-use Sub::Install		qw< install_sub >;
+use Sub::Install				qw< install_sub >;
 use File::Basename;
 
 use Pb::Command::Context;
@@ -401,7 +401,7 @@ sub SH (@)
 
 	# In the rare case where `--pretend` is set but `runmode` is *not* "NOACTION," don't send our
 	# output to the logfile.
-	push @cmd, ">>$FLOW->{LOGFILE}" if exists $FLOW->{LOGFILE} and not $OPT{pretend};
+	push @cmd, ">>$FLOW->{LOGFILE}", "2>&1" if exists $FLOW->{LOGFILE} and not $OPT{pretend};
 
 	my $exitval = bash @cmd;
 	if (defined wantarray)							# someone cares about our exit value
@@ -445,7 +445,10 @@ sub CODE (@)
 	my $retval;
 	eval
 	{
+		# Note that you can't do an `if` block here, because
+		# that would make a separate scope for the `local`.
 		local *STDOUT = $log if $log;
+		local *STDERR = $log if $log;
 		$retval = $block->();
 	};
 	if (not $retval or $@)
