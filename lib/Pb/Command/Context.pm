@@ -452,7 +452,7 @@ sub prep_logfile
 
 =head2 prep_pidfile
 
-Build a Proc::Pidfile object and handle any "already running" issues.
+Build a L<Proc::Pidfile> object and handle any "already running" issues.
 
 =cut
 

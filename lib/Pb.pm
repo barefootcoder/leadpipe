@@ -561,6 +561,7 @@ sub go
 =head1 SYNOPSIS
 
     use Pb;
+    use Path::Tiny;
     use Types::Standard -types;
 
     my %HOSTS =
@@ -576,7 +577,7 @@ sub go
     flow
     {
         verify { pwd eq $ENV{MY_ROOT_DIR} } 'must be run from $MY_ROOT_DIR';
-        verify { -x $FLOW->{file}         } 'file must exist';
+        verify { -f $FLOW->{file}         } 'file must exist';
 
         my $host = $HOSTS{$FLOW->{env}};
         my $from = path($FLOW->{file});
@@ -643,7 +644,7 @@ and context.
 
 =item *
 
-Will abort if any individual directive fails (like C<bash -e>).
+Will abort if any individual directive fails (similar to C<bash -e>).
 
 =item *
 
