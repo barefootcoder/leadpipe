@@ -268,6 +268,19 @@ END
 check_error pb_run('explode'), 1, "code_returns_false: code block [failure block] returned false value [undef]",
 		"`CODE` calls `fatal` (with block name) on false return";
 
+# failure of a `CODE` directive (name, no retval because block `die`s)
+pb_basecmd(code_dies => <<'END');
+	use Pb;
+	command explode => flow
+	{
+		CODE 'death block' => sub { die "dying here" };
+		SH echo => "should never get here";
+	};
+	Pb->go;
+END
+check_error pb_run('explode'), 1, "code_dies: code block [death block] died [dying here]",
+		"`CODE` calls `fatal` (with block name) on `die`";
+
 # variable accessed but not passed in
 pb_basecmd(varfail => <<'END');
 	use Pb;

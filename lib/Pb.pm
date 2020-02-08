@@ -443,14 +443,17 @@ sub CODE (@)
 	}
 
 	my $retval;
-	do
+	eval
 	{
 		local *STDOUT = $log if $log;
 		$retval = $block->();
 	};
-	unless ($retval)
+	if (not $retval or $@)
 	{
-		my $msg = "code block" . ($name ? " [$name]" : '') . " returned false value [" . ($retval // 'undef') . "]";
+		my $msg = "code block" . ($name ? " [$name]" : '');
+		$msg .= $@
+				? " died [" . $@ =~ s/( at \S+ line \d+\.?)\n.*\Z//rs . "]"
+				: " returned false value [" . ($retval // 'undef') . "]";
 		fatal($msg);
 	}
 }
