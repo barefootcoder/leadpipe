@@ -2,6 +2,10 @@ Revision history for Pb
 
 {{$NEXT}}
 
+    [Distro Fixes]
+    * Don't try to run unit tests on machines with no `bash`
+      (using code stolen from PerlX::bash)
+
 0.01_02   2020-02-05 15:46:43-08:00 America/Los_Angeles (TRIAL RELEASE)
 
     [Distro Fixes]

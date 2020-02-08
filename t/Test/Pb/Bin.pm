@@ -11,11 +11,20 @@ use Test::Most;
 
 use File::Temp			qw< tempdir >;
 use File::Path			qw< make_path >;
+use File::Spec;
 use File::Basename;
 
 
 my $TMPDIR = tempdir( TMPDIR => 1, CLEANUP => 1 );
 my $BASE;
+
+
+# this is how PerlX::bash does it
+{
+    my $devnull = File::Spec->devnull;
+    my $msg = 'successful';
+    `bash -c "echo $msg" 2>$devnull` eq "$msg\n" or plan skip_all => "no bash available!";
+}
 
 
 # helpers
