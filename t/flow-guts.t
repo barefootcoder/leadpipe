@@ -88,7 +88,7 @@ pb_basecmd(test_autodie => <<'END');
 	exit 2;
 END
 # apparently the exit value is not predictable across different versions of `autodie`
-check_error pb_run('help'), '?', qr/No such file or directory/, "autodie is turned on";
+check_error pb_run('help'), '?', qr/\Q$ERRNO{ENOENT}/, "autodie is turned on";
 
 # `verify` demands its second argument (otherwise the error message wouldn't be very useful)
 pb_basecmd(test_verify_syntax => <<'END');

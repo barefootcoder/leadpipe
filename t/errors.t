@@ -295,7 +295,7 @@ pb_basecmd(bad_file_write => <<'END');
 	};
 	Pb->go;
 END
-my $extended_msg = q|Can't open '/cant/possibly/exist' for writing: 'No such file or directory'|;
+my $extended_msg = qq[Can't open '/cant/possibly/exist' for writing: '$ERRNO{ENOENT}'];
 check_error pb_run('explode'), "bad_file_write: file read/write failure [$extended_msg]",
 		"catches failures in file ops";
 
