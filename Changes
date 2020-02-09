@@ -2,6 +2,8 @@ Revision history for Pb
 
 {{$NEXT}}
 
+0.01_04   2020-02-09 14:56:50-08:00 America/Los_Angeles (TRIAL RELEASE)
+
     [New Features]
     * New global option: `--interactive`
     * Now catching `die` inside a `CODE` directive (with appropriate error)
