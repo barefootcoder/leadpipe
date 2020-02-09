@@ -72,6 +72,11 @@ option pretend =>
 	is => 'ro', doc => "don't run commands; just print them",
 );
 
+option interactive =>
+(
+	is => 'ro', doc => "only run commands if user approves each one",
+);
+
 
 ###############
 # SCAFFOLDING #
@@ -383,6 +388,32 @@ sub verify (&$)
 }
 
 
+# figure out whether a directive should be executed, based on runmode
+sub _should_doit
+{
+	my ($dtype, $action) = @_;
+
+	if ( $FLOW->runmode eq 'NOACTION' )
+	{
+		my $msg = "would run";
+		$msg .= $dtype eq 'shell command' ? ':' : " $dtype";
+		$msg .= " $action" if $action;
+		say $msg;
+		return 0;
+	}
+	elsif ( $FLOW->runmode eq 'ASKACTION' )
+	{
+		my $prompt = "run $dtype?";
+		$prompt .= " $action" if $action;
+		$prompt .= "  [y/N] ";
+		print $prompt;
+		return <STDIN> =~ /^y/i;
+	}
+	# other run modes mean just do it
+	return 1;
+}
+
+
 =head2 SH
 
 Run a command in C<bash>.  If the command does not exit with 0, the entire command will exit.
@@ -393,11 +424,7 @@ sub SH (@)
 {
 	my @cmd = @_;
 
-	if ( $FLOW->runmode eq 'NOACTION' )
-	{
-		say "would run: @cmd";
-		return;
-	}
+	return unless _should_doit('shell command', "@cmd");
 
 	# In the rare case where `--pretend` is set but `runmode` is *not* "NOACTION," don't send our
 	# output to the logfile.
@@ -426,13 +453,7 @@ sub CODE (@)
 	my $block = pop;
 	my ($name) = @_;
 
-	if ( $FLOW->runmode eq 'NOACTION' )
-	{
-		my $msg = "would run code block";
-		$msg .= " [$name]" if $name;
-		say $msg;
-		return;
-	}
+	return unless _should_doit('code block', $name ? "[$name]" : '');
 
 	# If we have a logfile, better make sure our code block is printing to it rather than STDOUT, if
 	# it prints anything.

@@ -3,6 +3,7 @@ Revision history for Pb
 {{$NEXT}}
 
     [New Features]
+    * New global option: `--interactive`
     * Now catching `die` inside a `CODE` directive (with appropriate error)
     * STDERR now also goes to logfile (if any)
 

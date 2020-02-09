@@ -4,7 +4,7 @@ use 5.14.0;
 use autodie ':all';
 
 use Exporter 'import';
-our @EXPORT = qw< pb_basecmd pb_run check_output check_error _slurp %ERRNO >;
+our @EXPORT = qw< pb_basecmd pb_run pb_run_interactive check_output check_error _slurp %ERRNO >;
 
 
 use Test::Most;
@@ -70,12 +70,24 @@ sub pb_flowpm
 }
 
 
+use Test::Trap qw< :output(systemsafe) >;
+
 sub pb_run
 {
-	use Test::Trap qw< :output(systemsafe) >;
 	my @args = @_;
 
 	trap { system($BASE, @args) };
+	return $trap;
+}
+
+sub pb_run_interactive
+{
+	my $answers = pop;
+	my @args = @_;
+	die("answers must be all 'y' or 'n'") unless $answers =~ /^[yn]+$/;
+	$answers = join("\n", split(//, $answers));
+
+	trap { system("echo '$answers' | $BASE --interactive @args") };
 	return $trap;
 }
 

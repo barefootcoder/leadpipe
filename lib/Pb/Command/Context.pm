@@ -130,7 +130,8 @@ sub _prep_filename
 sub _extrapolate_run_mode
 {
 	my ($self) = @_;
-	return 'NOACTION' if $self->_opts->{pretend};
+	return 'NOACTION'  if $self->_opts->{pretend};
+	return 'ASKACTION' if $self->_opts->{interactive};
 	return 'ACTION';
 }
 
