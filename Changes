@@ -2,6 +2,10 @@ Revision history for Pb
 
 {{$NEXT}}
 
+    [Distro Fixes]
+    * Attempt to fix CPAN Testers failure caused by downstream bug:
+      CLI::Osprey not requiring proper version of Getopt::Long::Descriptive
+
 0.01_04   2020-02-09 14:56:50-08:00 America/Los_Angeles (TRIAL RELEASE)
 
     [New Features]
