@@ -54,10 +54,12 @@ list below is not in any particular order.
   implied if the constraint specifies an `ArrayRef` or somesuch); `required`
   would definitely never be necessary.  The only other one I can think of
   wanting is `short`, and we can just cross that bridge when we come to it.
+  **_NOTE:_** Now that we have `also`, any of these could done using that
+  syntax.
 * There are currently no syntax checks for the `also` keyword.  Syntax errors
   would include but not be limited to: using `also` where it doesn't make sense
   (e.g. in an `arg` or a `control`), giving `also` arguments that can't
-  possibly work out to a set of key/value pairs (e.g. `arg(1)`), or using the
+  possibly work out to a set of key/value pairs (e.g. `also(1)`), or using the
   "longcut" version of `also` without a hashref (e.g. `properties => 1`).
   However, an empty `also` (e.g. `also()`) should _not_ be considered an error.
   (I mean, it's stupid, but it's not an error.)
@@ -73,3 +75,14 @@ list below is not in any particular order.
 * Failure to supply a required argument gives you an error, because `undef`
   fails the validation check.  But the error should say that you failed to
   supply a required argument (duh).
+* Right now, global options *must* precede a subcommand, and
+  subcommand-specific options *must* follow it.  I'm okay with the latter
+  (putting a subcommand option before the name of the subcommand would feel
+  weird), but the former just messed with my head for like half an hour before
+  I realized I was just putting the `--pretend` in the wrong place.  That's
+  bound to bite other users as well, so consider doing _something_ to alleviate
+  that.  I think the only solution might be to add all the global options to
+  each subcommand (which is doable; cf the "global opts hash" stash), but then
+  you have to deal with the weirdness of people providing an option in both
+  places and then what if they have different values?  Needs further
+  consideration.
