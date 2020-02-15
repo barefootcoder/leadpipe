@@ -430,8 +430,14 @@ sub SH (@)
 	# output to the logfile.
 	push @cmd, ">>$FLOW->{LOGFILE}", "2>&1" if exists $FLOW->{LOGFILE} and not $OPT{pretend};
 
-	my $exitval = bash @cmd;
-	if (defined wantarray)							# someone cares about our exit value
+	my $exitval;
+	eval { $exitval = bash @cmd };
+	if ($@)											# total explosion :-(
+	{
+		chomp $@;
+		fatal("command [@_] had fatal error [$@]");
+	}
+	elsif (defined wantarray)						# someone cares about our exit value
 	{
 		return $exitval;
 	}

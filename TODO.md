@@ -86,3 +86,10 @@ list below is not in any particular order.
   you have to deal with the weirdness of people providing an option in both
   places and then what if they have different values?  Needs further
   consideration.
+* If you `SH` something, and the something is a Perl script, and the Perl
+  script `die`s, you get a radically different (and much uglier) error message.
+  That sux.  I'm still not entirely sure why a `die` from Perl is treated
+  differently than any other error exit, and I'm not sure if that's
+  PerlX::bash's fault, or autodie's fault, or IPC::System::Simple's fault ...
+  Either way, it needs to be fixed, or at least the turd needs to be polished
+  before passing it on to the user.

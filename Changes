@@ -2,6 +2,9 @@ Revision history for Pb
 
 {{$NEXT}}
 
+    [Bug Fixes]
+    * `SH` failure due to Perl `die` now being caught as expected.
+
 0.02      2020-02-10 22:15:50-08:00 America/Los_Angeles
 
     [New Features]
