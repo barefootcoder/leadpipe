@@ -38,3 +38,8 @@ inc/
 # `dzil build` dists
 Pb-*
 README.pod
+
+# Personal developer AI tool configurations
+.aider*
+.mcp.json
+**/.claude/settings.local.json
